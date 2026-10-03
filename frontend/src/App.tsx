@@ -1,10 +1,18 @@
-import HealthStatus from './features/health/HealthStatus'
+import HomePage from './features/auth/HomePage'
+import LoginPage from './features/auth/LoginPage'
+import { useSession } from './features/auth/useSession'
 
+/** Show the login screen until there is a session, then the protected screen. */
 export default function App() {
-  return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Finance Co-pilot</h1>
-      <HealthStatus />
-    </main>
-  )
+  const session = useSession()
+
+  if (session.isPending) {
+    return (
+      <main className="min-h-screen bg-slate-50 p-6">
+        <p className="text-slate-600">Loading…</p>
+      </main>
+    )
+  }
+
+  return session.data ? <HomePage /> : <LoginPage />
 }
