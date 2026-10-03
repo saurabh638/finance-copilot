@@ -56,4 +56,6 @@ def _empty_tables() -> None:
     from app.db import engine
 
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE TABLE sessions, users RESTART IDENTITY CASCADE"))
+        connection.execute(
+            text("TRUNCATE TABLE sessions, users, login_failures RESTART IDENTITY CASCADE")
+        )

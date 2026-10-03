@@ -11,6 +11,7 @@ from app.db import get_session
 from app.models import User
 from app.schemas.auth import LoginRequest, UserResponse
 from app.services.auth import authenticate, create_session, revoke_session
+from app.services.login_attempts import clear_failures, count_recent_failures, record_failure
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,14 +26,25 @@ def login(
 ) -> UserResponse:
     """Verify credentials, start a session and set the session cookie."""
     settings = get_settings()
+    now = datetime.now(UTC)
+
+    recent_failures = count_recent_failures(db, payload.email, now, settings.login_window_minutes)
+    if recent_failures >= settings.login_max_attempts:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts; try again later",
+        )
+
     user = authenticate(db, payload.email, payload.password)
     if user is None:
+        record_failure(db, payload.email, now, settings.login_window_minutes)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
-    token = create_session(db, user, datetime.now(UTC), settings.session_ttl_days)
+    clear_failures(db, payload.email)
+    token = create_session(db, user, now, settings.session_ttl_days)
     response.set_cookie(
         key=SESSION_COOKIE,
         value=token,

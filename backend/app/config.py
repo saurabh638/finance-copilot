@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     database_url: str
     test_database_url: str
     session_ttl_days: int = 30
+    login_max_attempts: int = 5
+    login_window_minutes: int = 15
     admin_email: str | None = None
     admin_password: str | None = None
 
