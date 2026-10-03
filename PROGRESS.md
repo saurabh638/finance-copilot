@@ -6,8 +6,8 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 | Milestone | Status | Notes |
 | --- | --- | --- |
-| Environment setup (Prompt 0) | not started | |
-| M1 Project skeleton | not started | |
+| Environment setup (Prompt 0) | done | Git + Docker only on host; repo initialised and pushed |
+| M1 Project skeleton | done | Approved; backend + frontend skeleton, all tooling green |
 | M2 Money module | not started | |
 | M3 Single-user login | not started | |
 | M4 Accounts backend | not started | |
@@ -31,7 +31,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-None yet.
+M1 done and committed on `m1-project-skeleton`. M2 (Money module) not started — awaiting the user.
 
 ## Open questions
 

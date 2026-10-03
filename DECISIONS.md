@@ -16,3 +16,6 @@ One line per non-obvious decision and why. The assistant adds to this after each
 | 2026-10-04 | Real balances and statements stay out of git (seed_local.json, data/samples, backups ignored) | Privacy; the repository may become shared |
 | 2026-10-04 | Deploy to a budget VPS behind Caddy, backups kept off the server | Free tiers sleep or expire; the data is financial history and needs a stable home |
 | 2026-10-04 | Work proceeds one milestone at a time with plan approval and a completion approval | Prevents large unreviewed changes from a coding model |
+| 2026-10-04 | A dedicated `finance_test` database is created by the Postgres init script; tests run against real Postgres | Integration tests need a real database, and development data must stay untouched |
+| 2026-10-04 | The backend container entrypoint runs `alembic upgrade head` before starting | A fresh database is always migrated, with no manual step |
+| 2026-10-04 | The frontend health check reads only the HTTP status, not the JSON body | Avoids hand-writing a duplicate of the server schema; generated OpenAPI types come later |
