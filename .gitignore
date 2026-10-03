@@ -1,0 +1,38 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+seed_local.json
+
+# Private financial data
+backups/*
+!backups/.gitkeep
+data/samples/*
+!data/samples/.gitkeep
+*.dump
+*.sql.gz
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+
+# Editors and OS
+.idea/
+.DS_Store
+Thumbs.db
+*.log
