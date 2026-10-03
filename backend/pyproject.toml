@@ -12,12 +12,18 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "ANN", "S", "C4", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests assert on behaviour, so S101 (use of assert) is expected there.
-"tests/**" = ["S101"]
+# Tests assert on behaviour, so S101 (use of assert) is expected there, and
+# S105/S106 flag the dummy credentials used as fixtures, which are not secrets.
+"tests/**" = ["S101", "S105", "S106"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's Depends is designed to be called in an argument default.
 extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.ruff.lint.isort]
+# `app` is the only first-party package. Without this, the local `alembic/`
+# directory makes ruff treat the alembic library as first-party too.
+known-first-party = ["app"]
 
 [tool.mypy]
 python_version = "3.12"

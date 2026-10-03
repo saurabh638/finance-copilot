@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     secret_key: str
     database_url: str
     test_database_url: str
+    session_ttl_days: int = 30
+    admin_email: str | None = None
+    admin_password: str | None = None
 
 
 @lru_cache
