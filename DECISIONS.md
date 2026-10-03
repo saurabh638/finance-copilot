@@ -23,3 +23,7 @@ One line per non-obvious decision and why. The assistant adds to this after each
 | 2026-10-04 | A split gives the remainder paise to the first parts | Deterministic, and the parts always sum back to the total with no paise lost or created |
 | 2026-10-04 | Parsing accepts Indian and Western digit grouping but rejects malformed grouping | Real inputs vary, yet broken grouping almost always means a typo worth failing on |
 | 2026-10-04 | The frontend mirrors only the money formatter, not a parser | The UI formats what the API sends; it never parses or does money arithmetic |
+| 2026-10-04 | Passwords are hashed with Argon2 (argon2-cffi) | Memory-hard and the algorithm named in ARCHITECTURE; never stored or logged in clear |
+| 2026-10-04 | Session tokens are random and stored only as a SHA-256 hash | A stolen database dump must not be replayable as a login |
+| 2026-10-04 | One app-level auth guard with an allowlist, not per-route dependencies | A router added later is protected by default and cannot be exposed by forgetting a dependency |
+| 2026-10-04 | `create-user` reads credentials from the environment, never CLI arguments | Passwords passed as arguments appear in shell history and the process list |
