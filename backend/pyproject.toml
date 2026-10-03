@@ -31,6 +31,11 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_unreachable = true
 
+[[tool.mypy.overrides]]
+# core/ is pure money and date logic, so it holds to the strictest bar.
+module = "app.core.*"
+strict = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=app --cov-report=term-missing --cov-fail-under=80"
