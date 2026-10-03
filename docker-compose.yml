@@ -1,0 +1,66 @@
+# Local development stack.
+# Everything runs in Docker: the host only needs Git and Docker (ARCHITECTURE.md).
+# Real values live in .env (gitignored); .env.example lists every variable.
+
+name: finance-copilot
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:?copy .env.example to .env first}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?copy .env.example to .env first}"
+      POSTGRES_DB: "${POSTGRES_DB:?copy .env.example to .env first}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Creates the dedicated pytest database on first initialisation only.
+      - ./scripts/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `$$` escapes so the container's own shell expands these, not Compose.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Source mounted for hot reload; site-packages live outside /app.
+      - ./backend:/app
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      # Source mounted for hot reload.
+      - ./frontend:/app
+      # Keep the image's node_modules rather than the host's (there is none).
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:5173:5173"
+
+volumes:
+  pgdata:
