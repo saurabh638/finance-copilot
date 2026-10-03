@@ -28,3 +28,7 @@ One line per non-obvious decision and why. The assistant adds to this after each
 | 2026-10-04 | One app-level auth guard with an allowlist, not per-route dependencies | A router added later is protected by default and cannot be exposed by forgetting a dependency |
 | 2026-10-04 | `create-user` reads credentials from the environment, never CLI arguments | Passwords passed as arguments appear in shell history and the process list |
 | 2026-10-04 | Login rate limiting lives in Postgres (`login_failures`), not in memory | CODING_STANDARDS section 6 needs a limit and section 3.1 forbids global mutable state; Postgres also survives restarts and extra workers |
+| 2026-10-04 | Server state lives in TanStack Query; React keeps no copy of it | CODING_STANDARDS section 4.2: one cache, no duplicated server state |
+| 2026-10-04 | The app swaps login and home on session state instead of adding React Router | Two screens do not justify a router dependency; routing arrives with real screens |
+| 2026-10-04 | The M1 health placeholder (`HealthStatus`) was removed in M3b | The real login and home screens replace the placeholder page, so it became dead code |
+| 2026-10-04 | Testing Library cleanup is registered explicitly in the test setup | Vitest runs without globals, so the library cannot auto-register it and the DOM leaked between tests |

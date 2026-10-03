@@ -9,7 +9,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | Environment setup (Prompt 0) | done | Git + Docker only on host; repo initialised and pushed |
 | M1 Project skeleton | done | Approved; backend + frontend skeleton, all tooling green |
 | M2 Money module | done | Integer paise parse/format/split in core; formatter mirrored in lib/money.ts |
-| M3 Single-user login | built, awaiting verification | Split — M3a backend auth incl. DB-backed login rate limit: done, approved; M3b login UI: not started |
+| M3 Single-user login | done | M3a backend auth + DB-backed login rate limit, M3b login UI. Approved. |
 | M4 Accounts backend | not started | |
 | M5 Accounts screen and real account setup | not started | |
 | M6 Backup and restore | not started | |
@@ -31,7 +31,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M3a (backend auth) done on `m3a-backend-auth` and merged to `main`. M3b (login UI) not started — awaiting the user.
+M3 done on `m3b-login-ui` and merged to `main`. M4 (Accounts backend) — plan awaiting `APPROVED PLAN`.
 
 ## Open questions
 
