@@ -9,7 +9,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | Environment setup (Prompt 0) | done | Git + Docker only on host; repo initialised and pushed |
 | M1 Project skeleton | done | Approved; backend + frontend skeleton, all tooling green |
 | M2 Money module | done | Integer paise parse/format/split in core; formatter mirrored in lib/money.ts |
-| M3 Single-user login | built, awaiting verification | Split — M3a backend auth: done, approved; M3b login UI: not started |
+| M3 Single-user login | built, awaiting verification | Split — M3a backend auth incl. DB-backed login rate limit: done, approved; M3b login UI: not started |
 | M4 Accounts backend | not started | |
 | M5 Accounts screen and real account setup | not started | |
 | M6 Backup and restore | not started | |
@@ -35,4 +35,4 @@ M3a (backend auth) done on `m3a-backend-auth` and merged to `main`. M3b (login U
 
 ## Open questions
 
-- Login rate limiting (CODING_STANDARDS section 6) is not implemented: an in-memory limiter conflicts with section 3.1 (no global mutable state), and a DB-backed limiter is a schema change. Decide: DB-backed now, in-memory, or defer.
+None yet.

@@ -27,3 +27,4 @@ One line per non-obvious decision and why. The assistant adds to this after each
 | 2026-10-04 | Session tokens are random and stored only as a SHA-256 hash | A stolen database dump must not be replayable as a login |
 | 2026-10-04 | One app-level auth guard with an allowlist, not per-route dependencies | A router added later is protected by default and cannot be exposed by forgetting a dependency |
 | 2026-10-04 | `create-user` reads credentials from the environment, never CLI arguments | Passwords passed as arguments appear in shell history and the process list |
+| 2026-10-04 | Login rate limiting lives in Postgres (`login_failures`), not in memory | CODING_STANDARDS section 6 needs a limit and section 3.1 forbids global mutable state; Postgres also survives restarts and extra workers |
