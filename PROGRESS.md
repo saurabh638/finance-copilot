@@ -8,7 +8,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | --- | --- | --- |
 | Environment setup (Prompt 0) | done | Git + Docker only on host; repo initialised and pushed |
 | M1 Project skeleton | done | Approved; backend + frontend skeleton, all tooling green |
-| M2 Money module | not started | |
+| M2 Money module | done | Integer paise parse/format/split in core; formatter mirrored in lib/money.ts |
 | M3 Single-user login | not started | |
 | M4 Accounts backend | not started | |
 | M5 Accounts screen and real account setup | not started | |
@@ -31,7 +31,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M1 done and committed on `m1-project-skeleton`. M2 (Money module) not started — awaiting the user.
+M2 done on `m2-money-module` and merged to `main`. M3 (Single-user login) not started — awaiting the user.
 
 ## Open questions
 

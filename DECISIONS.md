@@ -19,3 +19,7 @@ One line per non-obvious decision and why. The assistant adds to this after each
 | 2026-10-04 | A dedicated `finance_test` database is created by the Postgres init script; tests run against real Postgres | Integration tests need a real database, and development data must stay untouched |
 | 2026-10-04 | The backend container entrypoint runs `alembic upgrade head` before starting | A fresh database is always migrated, with no manual step |
 | 2026-10-04 | The frontend health check reads only the HTTP status, not the JSON body | Avoids hand-writing a duplicate of the server schema; generated OpenAPI types come later |
+| 2026-10-04 | Money parsing rejects more than two decimal places instead of rounding | A silently rounded amount is a wrong number the user would never see |
+| 2026-10-04 | A split gives the remainder paise to the first parts | Deterministic, and the parts always sum back to the total with no paise lost or created |
+| 2026-10-04 | Parsing accepts Indian and Western digit grouping but rejects malformed grouping | Real inputs vary, yet broken grouping almost always means a typo worth failing on |
+| 2026-10-04 | The frontend mirrors only the money formatter, not a parser | The UI formats what the API sends; it never parses or does money arithmetic |
