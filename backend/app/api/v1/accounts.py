@@ -1,8 +1,10 @@
-"""Account endpoints, including each account's interest-rate history.
+"""Account endpoints, including each account's interest-rate history and balance.
 
 Thin layer: parse the request, call one service function, translate a service
 error into an HTTP status. No business rules live here.
 """
+
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -12,7 +14,8 @@ from app.db import get_session
 from app.models import User
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
 from app.schemas.interest_rate import InterestRateCreate, InterestRateResponse
-from app.services import interest_rates
+from app.schemas.transaction import BalanceResponse
+from app.services import interest_rates, transactions
 from app.services.accounts import (
     AccountNotFoundError,
     InvalidAccountError,
@@ -109,6 +112,32 @@ def destroy(
     except AccountNotFoundError as error:
         raise _not_found(account_id) from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{account_id}/balance",
+    response_model=BalanceResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "The account does not exist"}},
+)
+def read_balance(
+    account_id: int,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+    as_of: date | None = None,
+) -> BalanceResponse:
+    """The account's balance, and the two figures it was worked out from."""
+    try:
+        found = transactions.balance(db, user.id, account_id, as_of)
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+
+    return BalanceResponse(
+        account_id=found.account_id,
+        as_of=found.as_of,
+        opening_balance_paise=found.opening_balance_paise,
+        postings_paise=found.postings_paise,
+        balance_paise=found.balance_paise,
+    )
 
 
 def _rate_not_found(rate_id: int) -> HTTPException:
