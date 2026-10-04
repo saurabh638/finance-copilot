@@ -32,3 +32,9 @@ One line per non-obvious decision and why. The assistant adds to this after each
 | 2026-10-04 | The app swaps login and home on session state instead of adding React Router | Two screens do not justify a router dependency; routing arrives with real screens |
 | 2026-10-04 | The M1 health placeholder (`HealthStatus`) was removed in M3b | The real login and home screens replace the placeholder page, so it became dead code |
 | 2026-10-04 | Testing Library cleanup is registered explicitly in the test setup | Vitest runs without globals, so the library cannot auto-register it and the DOM leaked between tests |
+| 2026-10-04 | Account `type` and `capture_mode` are VARCHAR plus a CHECK constraint, not Postgres enums | Adding a kind later is an ordinary migration instead of an `ALTER TYPE` every deployment must apply in lockstep |
+| 2026-10-04 | `loan` is in `AccountType` even though MILESTONES.md M4 lists only eight kinds | ARCHITECTURE.md treats loans as accounts; the CHECK makes it cheap to allow now and impossible to forget later |
+| 2026-10-04 | An account's `type` cannot be changed after creation | Postings, credit-card rules and importers key off it, so a change would silently reinterpret existing history |
+| 2026-10-04 | A pot needs exactly one live, non-pot parent, enforced in the database and the service | The invariant is what makes pots and sub-balances work with no special cases, so it must not depend on one code path |
+| 2026-10-04 | Service functions raise domain errors (`AccountNotFoundError`, `InvalidAccountError`); only routers map them to HTTP statuses | Keeps HTTP out of the logic layer and gives exactly one place per status code |
+| 2026-10-04 | M4 was split into M4a (accounts) and M4b (interest rates) after the plan review | The account model and CRUD already exceed one reviewable step, and rate history needs its own tests |

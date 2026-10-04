@@ -10,7 +10,8 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M1 Project skeleton | done | Approved; backend + frontend skeleton, all tooling green |
 | M2 Money module | done | Integer paise parse/format/split in core; formatter mirrored in lib/money.ts |
 | M3 Single-user login | done | M3a backend auth + DB-backed login rate limit, M3b login UI. Approved. |
-| M4 Accounts backend | not started | |
+| M4a Accounts CRUD backend | done | Account model, migration 0004, CRUD under `/api/v1/accounts`, soft delete. Approved. |
+| M4b Interest rates | not started | Second half of MILESTONES.md M4: `InterestRate` model, migration 0005, rate history that never overwrites. |
 | M5 Accounts screen and real account setup | not started | |
 | M6 Backup and restore | not started | |
 | M7 Postings and ledger core | not started | |
@@ -31,8 +32,15 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M3 done on `m3b-login-ui` and merged to `main`. M4 (Accounts backend) — plan awaiting `APPROVED PLAN`.
+M4a (accounts CRUD backend) approved and on `main`. M4 was split into M4a (accounts) and M4b
+(interest rates) when the plan was reviewed, because the model, migration, CRUD endpoints and
+their tests already exceed one reviewable step and the rate history needs its own tests.
+**M4b is next, and needs its plan approved before any code.**
 
 ## Open questions
 
-None yet.
+- Error body shape: CODING_STANDARDS.md section 3.4 asks for a consistent error body with a
+  `code` and a `message`, but the API still returns FastAPI's `{"detail": ...}` on the auth and
+  account routes. Proposed as its own small change, not part of M4b.
+- `PATCH /api/v1/accounts/{id}` ignores unknown fields, so `{"type": "cash"}` returns 200 and
+  changes nothing. Proposed: reject unknown fields with 422 instead of ignoring them.
