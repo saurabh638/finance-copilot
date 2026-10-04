@@ -14,7 +14,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M4b Interest rates | done | Second half of MILESTONES.md M4: `InterestRate` model, migration 0005, dated history that is never overwritten, 3 endpoints. Approved. |
 | M5a Accounts screen: list and add | done | Accounts page, add form, money text parsed to paise in the frontend, API types generated from the schema. Approved. |
 | M5b Edit an account and its rate history | done | Inline editor per account: change the settings (type shown fixed), append dated rates, remove one only after a confirmation. Approved. |
-| M5c Interactive seed command | not started | The six real accounts, from prompts for opening balance and start date. |
+| M5c Interactive seed command | done | `seed` asks for each account's balance and start date, skips what already exists, and offers `--demo` / `--remove-demo`. Approved. |
 | M6 Backup and restore | not started | |
 | M7 Postings and ledger core | not started | |
 | M8 Manual transaction entry | not started | |
@@ -34,11 +34,15 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M4 (accounts CRUD, interest rates), M5a (accounts screen: list and add) and M5b (inline editor and
-rate history) are built and on `main`. M5 was split into M5a, M5b and M5c during plan review because
-the screen, its tests and the seed command together are well past one reviewable change.
-**M5c (the interactive seed command) is next.** It can be built and verified with placeholder values;
-the real balances and start dates are only needed when the user runs it.
+M4 (accounts CRUD, interest rates) and M5 (accounts screen, editor, seed command) are built and on
+`main`; M5 was split into M5a, M5b and M5c during plan review. **M6 (backup and restore) is next.**
+
+Two things before the app holds real data:
+
+- Running `seed` for real needs the 12 values only the user can give: for each of the six accounts, the
+  balance that was true on a start date, and that date. Nothing else blocks it.
+- The development database currently holds the six placeholder accounts from `seed --demo`.
+  `seed --remove-demo` clears them, and they do not block a real run, which uses the plain names.
 
 ## Open questions
 
