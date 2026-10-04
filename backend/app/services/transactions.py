@@ -20,6 +20,7 @@ from app.core.ledger import (
     transfer_amounts,
 )
 from app.models import Account, Posting, PostingKind, Transaction, TransactionSource
+from app.schemas.transaction import TransactionUpdate
 from app.services.accounts import get_account
 
 
@@ -255,3 +256,134 @@ def _require_on_or_after_opening(account: Account, on: date) -> None:
         raise InvalidTransactionError(
             f"{account.name} opened on {account.opening_date}, so {on} is too early"
         )
+
+
+@dataclass(frozen=True)
+class TransactionDetail:
+    """A transaction with the postings that belong to it."""
+
+    transaction: Transaction
+    postings: list[Posting]
+
+
+def transaction_detail(db: DbSession, user_id: int, transaction_id: int) -> TransactionDetail:
+    """Return one live transaction together with its live postings."""
+    transaction = get_transaction(db, user_id, transaction_id)
+    postings = _live_postings_for(db, [transaction.id])
+    return TransactionDetail(transaction, postings.get(transaction.id, []))
+
+
+def list_transactions(
+    db: DbSession,
+    user_id: int,
+    *,
+    account_id: int | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    kind: PostingKind | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TransactionDetail]:
+    """The user's live transactions, newest first, with their postings.
+
+    The filters combine: an account and a kind together mean a transaction that
+    has a posting matching both.
+    """
+    statement = _live_transactions(user_id).order_by(
+        Transaction.transaction_date.desc(),
+        Transaction.id.desc(),
+    )
+    if from_date is not None:
+        statement = statement.where(Transaction.transaction_date >= from_date)
+    if to_date is not None:
+        statement = statement.where(Transaction.transaction_date <= to_date)
+    if account_id is not None or kind is not None:
+        statement = statement.where(Transaction.id.in_(_matching_transaction_ids(account_id, kind)))
+
+    transactions_found = list(db.scalars(statement.limit(limit).offset(offset)))
+    postings = _live_postings_for(db, [found.id for found in transactions_found])
+    return [TransactionDetail(found, postings.get(found.id, [])) for found in transactions_found]
+
+
+def update_transaction(
+    db: DbSession,
+    user_id: int,
+    transaction_id: int,
+    changes: TransactionUpdate,
+) -> Transaction:
+    """Apply the changes given, and nothing else.
+
+    The accounts and the kind are fixed: a movement recorded against the wrong
+    account is deleted and recorded again, which keeps the ledger's history
+    honest rather than quietly rewriting where money went.
+    """
+    transaction = get_transaction(db, user_id, transaction_id)
+    postings = _postings_of(db, transaction_id)
+
+    if changes.transaction_date is not None:
+        for posting in postings:
+            account = db.get(Account, posting.account_id)
+            if account is not None:
+                _require_on_or_after_opening(account, changes.transaction_date)
+        transaction.transaction_date = changes.transaction_date
+
+    # An omitted field is left alone; an explicit null clears it.
+    if "merchant" in changes.model_fields_set:
+        transaction.merchant = changes.merchant
+    if "note" in changes.model_fields_set:
+        transaction.note = changes.note
+
+    if changes.amount_paise is not None:
+        if len(postings) != 1:
+            raise InvalidTransactionError(
+                "an amount can only be changed for a transaction with one posting; "
+                "delete it and record it again"
+            )
+        postings[0].amount_paise = _signed_amount(postings[0].kind, changes.amount_paise)
+
+    db.commit()
+    return transaction
+
+
+def _signed_amount(kind: PostingKind, amount_paise: int) -> int:
+    """The signed amount a kind implies, so an edit cannot flip a direction."""
+    if kind is PostingKind.EXPENSE:
+        return -amount_paise
+    if kind is PostingKind.INCOME:
+        return amount_paise
+    raise InvalidTransactionError(f"the amount of a {kind} cannot be changed yet")
+
+
+def _matching_transaction_ids(
+    account_id: int | None,
+    kind: PostingKind | None,
+) -> Select[int]:
+    """The ids of transactions holding a posting with this account and kind."""
+    statement = select(Posting.transaction_id).where(Posting.deleted_at.is_(None))
+    if account_id is not None:
+        statement = statement.where(Posting.account_id == account_id)
+    if kind is not None:
+        statement = statement.where(Posting.kind == kind)
+    return statement
+
+
+def _live_postings_for(
+    db: DbSession,
+    transaction_ids: Sequence[int],
+) -> dict[int, list[Posting]]:
+    """The live postings of several transactions, in one query, keyed by transaction."""
+    if not transaction_ids:
+        return {}
+
+    rows = db.scalars(
+        select(Posting)
+        .where(
+            Posting.transaction_id.in_(transaction_ids),
+            Posting.deleted_at.is_(None),
+        )
+        .order_by(Posting.id)
+    )
+    grouped: dict[int, list[Posting]] = {}
+    for posting in rows:
+        grouped.setdefault(posting.transaction_id, []).append(posting)
+    return grouped
