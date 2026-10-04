@@ -15,6 +15,8 @@ select = ["E", "F", "I", "B", "UP", "ANN", "S", "C4", "SIM", "RUF"]
 # Tests assert on behaviour, so S101 (use of assert) is expected there, and
 # S105/S106 flag the dummy credentials used as fixtures, which are not secrets.
 "tests/**" = ["S101", "S105", "S106"]
+# Generated migrations hold long DDL string literals that cannot be wrapped.
+"alembic/versions/*.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's Depends is designed to be called in an argument default.
