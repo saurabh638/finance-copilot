@@ -25,7 +25,7 @@ You never install Python or Node. Everything runs inside Docker.
 | `DECISIONS.md` | Short log of non-obvious decisions and why | Both |
 | `.env.example` | Every environment variable, no real values | Both |
 | `.gitignore`, `.gitattributes`, `.editorconfig`, `.vscode/` | Git hygiene and editor settings | Tools |
-| `backups/`, `data/samples/`, `scripts/` | Database backups, redacted bank statements, helper scripts (the first two are git-ignored) | Later milestones |
+| `backups/`, `data/samples/`, `scripts/` | Database backups, redacted bank statements, helper scripts (the first two are git-ignored) | Backups from M6, statements later |
 
 ## The working loop
 
@@ -48,10 +48,45 @@ docker compose exec frontend npm run lint       # frontend lint
 docker compose exec frontend npm run format:check
 docker compose exec frontend npm run typecheck
 docker compose exec frontend npm test           # frontend tests
+
+./scripts/backup.sh                             # dump the live database into backups/
+./scripts/restore.sh <dump-file>                # restore a dump into a scratch database
+./scripts/check-backup-restore.sh               # take a dump, restore it, compare row counts
 ```
+
+## Backups
+
+`./scripts/backup.sh` writes a dated, compressed dump to `backups/` (git-ignored) and then
+**reads it back** with `pg_restore --list`, so a truncated file fails immediately instead of on
+the day you need it. It refuses to overwrite an existing file, and the path it wrote is the last
+thing it prints. Keep a copy somewhere other than this machine: the whole point is surviving the
+laptop.
+
+`./scripts/restore.sh <dump-file>` restores into a **scratch database** (`finance_restore`, dropped
+and recreated each time, `--database NAME` to choose another) and prints each table's row count.
+It refuses `finance` outright, so no typo can replace your live data. Nothing else may use the
+scratch database's name.
+
+`./scripts/check-backup-restore.sh` is the proof the backup is real: it takes a dump, restores it
+into scratch, and compares every table's row count between the two. Run it while the app is idle
+and before any risky change.
+
+Replacing the live database with a restored copy is **deliberately not a script**. Do it only as a
+last resort, and take a fresh backup first:
+
+```text
+./scripts/backup.sh                                                     # so you can go back
+docker compose stop backend
+./scripts/restore.sh <dump-file> --database finance_promote             # restore and check it
+docker compose exec db psql -U finance -d postgres -c 'DROP DATABASE IF EXISTS finance WITH (FORCE)'
+docker compose exec db psql -U finance -d postgres -c 'ALTER DATABASE finance_promote RENAME TO finance'
+docker compose start backend                    # give it a few seconds; docker compose ps shows healthy
+```
+
+Your login still works afterwards, because sessions live in the database that was restored.
 
 ## Privacy ground rules
 
 - Real balances, bank statements, backups and secrets never go into git. `.env`, `backups/`, `data/samples/` and `seed_local.json` are ignored.
-- Take a database backup before any risky change, and again after the first week of real data (available after Milestone 6).
+- Take a database backup with `./scripts/backup.sh` before any risky change, and again after the first week of real data. Keep copies off this machine.
 - Review `git diff --staged` before every commit.
