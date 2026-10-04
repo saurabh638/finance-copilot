@@ -12,7 +12,9 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M3 Single-user login | done | M3a backend auth + DB-backed login rate limit, M3b login UI. Approved. |
 | M4a Accounts CRUD backend | done | Account model, migration 0004, CRUD under `/api/v1/accounts`, soft delete. Approved. |
 | M4b Interest rates | done | Second half of MILESTONES.md M4: `InterestRate` model, migration 0005, dated history that is never overwritten, 3 endpoints. Approved. |
-| M5 Accounts screen and real account setup | not started | |
+| M5a Accounts screen: list and add | done | Accounts page, add form, money text parsed to paise in the frontend, API types generated from the schema. Approved. |
+| M5b Edit an account and its rate history | not started | Editing account fields; appending and soft-deleting dated rates in the UI. |
+| M5c Interactive seed command | not started | The six real accounts, from prompts for opening balance and start date. |
 | M6 Backup and restore | not started | |
 | M7 Postings and ledger core | not started | |
 | M8 Manual transaction entry | not started | |
@@ -32,13 +34,15 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M4 (M4a accounts CRUD, M4b interest rates) is built and on `main`. The milestone was split into
-M4a and M4b during plan review because the account model, the CRUD endpoints and their tests
-already exceeded one reviewable step, and the rate history needed its own tests.
-**M5 (accounts screen and real account setup) is next, and needs its plan approved before any code.**
+M4 (M4a accounts CRUD, M4b interest rates) and M5a (accounts screen: list and add) are built and on
+`main`. M5 was split into M5a, M5b and M5c during plan review because the screen, its tests and
+the seed command together are well past one reviewable change.
+**M5b (edit an account and its rate history) is next, and needs its plan approved before any code.**
 
 ## Open questions
 
+- M5b before M5c, or the seed command first so the real accounts can go in sooner? The M5 plan
+  proposed M5a, M5b, M5c, but MILESTONES.md's own verification needs M5a plus M5c.
 - Error body shape: CODING_STANDARDS.md section 3.4 asks for a consistent error body with a
   `code` and a `message`, but the API still returns FastAPI's `{"detail": ...}` on the auth and
   account routes. Proposed as its own small change.
