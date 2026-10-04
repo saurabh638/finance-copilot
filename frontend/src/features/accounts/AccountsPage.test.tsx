@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchSession } from '../../lib/api'
 import AccountsPage from './AccountsPage'
-import { createAccount, createRate, fetchAccounts, type Account } from './api'
+import { createAccount, createRate, fetchAccounts, fetchRates, updateAccount } from './api'
+import type { Account } from './api'
 
 vi.mock('../../lib/api')
 vi.mock('./api')
@@ -51,6 +52,7 @@ describe('AccountsPage', () => {
   beforeEach(() => {
     vi.mocked(fetchSession).mockResolvedValue(USER)
     vi.mocked(fetchAccounts).mockResolvedValue([SAVINGS])
+    vi.mocked(fetchRates).mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -122,5 +124,41 @@ describe('AccountsPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'a pot cannot be the parent of another pot',
     )
+  })
+
+  it('opens an editor holding the account and its rate history', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    expect(await screen.findByLabelText('Name')).toHaveValue('SBI')
+    expect(screen.getByLabelText('Opening balance')).toHaveValue('₹1,23,456.78')
+    expect(screen.getByRole('heading', { name: 'Interest rates' })).toBeInTheDocument()
+    expect(fetchRates).toHaveBeenCalledWith(SAVINGS.id)
+  })
+
+  it('saves an edited account as paise and says so', async () => {
+    vi.mocked(updateAccount).mockResolvedValue({ ...SAVINGS, name: 'SBI salary' })
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'SBI salary' } })
+    fireEvent.change(screen.getByLabelText('Opening balance'), { target: { value: '5,000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('SBI was saved.')
+    expect(vi.mocked(updateAccount).mock.calls[0]?.[0]).toBe(SAVINGS.id)
+    expect(vi.mocked(updateAccount).mock.calls[0]?.[1].opening_balance_paise).toBe(500_000)
+  })
+
+  it('keeps the editor open and shows why a save was refused', async () => {
+    vi.mocked(updateAccount).mockRejectedValue(new Error('Account 1 does not exist'))
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'SBI salary' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Account 1 does not exist')
+    expect(screen.getByLabelText('Name')).toHaveValue('SBI salary')
   })
 })

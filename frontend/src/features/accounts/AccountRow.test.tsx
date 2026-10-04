@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
 import { formatPaise } from '../../lib/money'
 import type { Account } from './api'
@@ -21,12 +21,16 @@ const SAVINGS: Account = {
   updated_at: '2026-04-01T00:00:00Z',
 }
 
-function renderRow(account: Account, parentName?: string) {
+function renderRow(account: Account, parentName?: string, isEditing = false) {
+  const onEdit = vi.fn()
   render(
     <ul>
-      <AccountRow account={account} parentName={parentName} />
+      <AccountRow account={account} parentName={parentName} isEditing={isEditing} onEdit={onEdit}>
+        {isEditing && <p>editor</p>}
+      </AccountRow>
     </ul>,
   )
+  return onEdit
 }
 
 describe('AccountRow', () => {
@@ -54,5 +58,23 @@ describe('AccountRow', () => {
     renderRow({ ...SAVINGS, is_active: false })
 
     expect(screen.getByText('Not active')).toBeInTheDocument()
+  })
+
+  it('asks to open the editor, and shows it when open', () => {
+    const onEdit = renderRow(SAVINGS)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    expect(onEdit).toHaveBeenCalled()
+    expect(screen.queryByText('editor')).not.toBeInTheDocument()
+
+    renderRow(SAVINGS, undefined, true)
+    expect(screen.getAllByText('editor')[0]).toBeInTheDocument()
+  })
+
+  it('offers to close instead of edit while the editor is open', () => {
+    renderRow(SAVINGS, undefined, true)
+
+    expect(screen.getAllByRole('button', { name: 'Close' })[0]).toBeInTheDocument()
   })
 })

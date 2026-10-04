@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { useLogout, useSession } from '../auth/useSession'
+import AccountEditor from './AccountEditor'
 import AccountForm from './AccountForm'
 import AccountRow from './AccountRow'
 import { type NewAccount, useAccounts, useCreateAccount } from './useAccounts'
@@ -16,6 +17,7 @@ export default function AccountsPage() {
   const accounts = useAccounts()
   const createAccount = useCreateAccount()
   const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const list = accounts.data ?? []
@@ -80,7 +82,20 @@ export default function AccountsPage() {
               key={account.id}
               account={account}
               parentName={account.parent_id === null ? undefined : byId.get(account.parent_id)}
-            />
+              isEditing={editingId === account.id}
+              onEdit={() => setEditingId(editingId === account.id ? null : account.id)}
+            >
+              {editingId === account.id && (
+                <AccountEditor
+                  account={account}
+                  parents={parents.filter((candidate) => candidate.id !== account.id)}
+                  onClose={(message) => {
+                    setEditingId(null)
+                    setNotice(message ?? null)
+                  }}
+                />
+              )}
+            </AccountRow>
           ))}
         </ul>
       )}
