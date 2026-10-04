@@ -70,6 +70,7 @@ def _empty_tables() -> None:
     with engine.begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE TABLE sessions, users, login_failures, accounts RESTART IDENTITY CASCADE"
+                "TRUNCATE TABLE sessions, users, login_failures, accounts, "
+                "interest_rates RESTART IDENTITY CASCADE"
             )
         )

@@ -1,4 +1,4 @@
-"""Account endpoints.
+"""Account endpoints, including each account's interest-rate history.
 
 Thin layer: parse the request, call one service function, translate a service
 error into an HTTP status. No business rules live here.
@@ -11,6 +11,8 @@ from app.api.deps import get_current_user
 from app.db import get_session
 from app.models import User
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
+from app.schemas.interest_rate import InterestRateCreate, InterestRateResponse
+from app.services import interest_rates
 from app.services.accounts import (
     AccountNotFoundError,
     InvalidAccountError,
@@ -20,6 +22,7 @@ from app.services.accounts import (
     soft_delete_account,
     update_account,
 )
+from app.services.interest_rates import DuplicateRateError, RateNotFoundError
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -105,4 +108,85 @@ def destroy(
         soft_delete_account(db, user.id, account_id)
     except AccountNotFoundError as error:
         raise _not_found(account_id) from error
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _rate_not_found(rate_id: int) -> HTTPException:
+    """The single 404 raised for an unknown or soft-deleted rate."""
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Interest rate {rate_id} does not exist",
+    )
+
+
+def _duplicate(error: DuplicateRateError) -> HTTPException:
+    """The account already has a live rate starting on that date."""
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
+
+
+@router.post(
+    "/{account_id}/interest-rates",
+    response_model=InterestRateResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "The account does not exist"},
+        status.HTTP_409_CONFLICT: {"description": "A live rate already starts on that date"},
+    },
+)
+def create_rate(
+    account_id: int,
+    payload: InterestRateCreate,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> InterestRateResponse:
+    """Record a rate from a given date. Earlier rates are left untouched."""
+    try:
+        rate = interest_rates.create_rate(db, user.id, account_id, payload)
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+    except DuplicateRateError as error:
+        raise _duplicate(error) from error
+    return InterestRateResponse.model_validate(rate)
+
+
+@router.get(
+    "/{account_id}/interest-rates",
+    response_model=list[InterestRateResponse],
+    responses={status.HTTP_404_NOT_FOUND: {"description": "The account does not exist"}},
+)
+def list_interest_rates(
+    account_id: int,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[InterestRateResponse]:
+    """List an account's rates, newest first."""
+    try:
+        rates = interest_rates.list_rates(db, user.id, account_id, limit, offset)
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+    return [InterestRateResponse.model_validate(rate) for rate in rates]
+
+
+@router.delete(
+    "/{account_id}/interest-rates/{rate_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "The account or the rate does not exist"}
+    },
+)
+def delete_rate(
+    account_id: int,
+    rate_id: int,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Soft-delete a rate. The row is kept, so the history stays auditable."""
+    try:
+        interest_rates.soft_delete_rate(db, user.id, account_id, rate_id)
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+    except RateNotFoundError as error:
+        raise _rate_not_found(rate_id) from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
