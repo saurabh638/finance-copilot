@@ -1,8 +1,8 @@
-import HomePage from './features/auth/HomePage'
+import AccountsPage from './features/accounts/AccountsPage'
 import LoginPage from './features/auth/LoginPage'
 import { useSession } from './features/auth/useSession'
 
-/** Show the login screen until there is a session, then the protected screen. */
+/** Show the login screen until there is a session, then the user's accounts. */
 export default function App() {
   const session = useSession()
 
@@ -14,5 +14,5 @@ export default function App() {
     )
   }
 
-  return session.data ? <HomePage /> : <LoginPage />
+  return session.data ? <AccountsPage /> : <LoginPage />
 }

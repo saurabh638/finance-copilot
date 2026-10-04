@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import { fetchAccounts } from './features/accounts/api'
 import { fetchSession, login, logout } from './lib/api'
 
 vi.mock('./lib/api')
+vi.mock('./features/accounts/api')
 
 const USER = { id: 1, email: 'owner@example.com' }
 
@@ -25,6 +27,10 @@ async function fillAndSubmit(email: string, password: string) {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    vi.mocked(fetchAccounts).mockResolvedValue([])
+  })
+
   afterEach(() => {
     vi.clearAllMocks()
   })
@@ -37,15 +43,16 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'Log in' })).toBeInTheDocument()
   })
 
-  it('shows the home page when a session already exists', async () => {
+  it('shows the accounts screen when a session already exists', async () => {
     vi.mocked(fetchSession).mockResolvedValue(USER)
 
     renderApp()
 
     expect(await screen.findByText(`Signed in as ${USER.email}`)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Accounts' })).toBeInTheDocument()
   })
 
-  it('signs in and reveals the home page', async () => {
+  it('signs in and reveals the accounts screen', async () => {
     vi.mocked(fetchSession).mockResolvedValue(null)
     vi.mocked(login).mockResolvedValue(USER)
 
