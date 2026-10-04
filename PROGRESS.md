@@ -16,7 +16,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M5b Edit an account and its rate history | done | Inline editor per account: change the settings (type shown fixed), append dated rates, remove one only after a confirmation. Approved. |
 | M5c Interactive seed command | done | `seed` asks for each account's balance and start date, skips what already exists, and offers `--demo` / `--remove-demo`. Approved. |
 | M6 Backup and restore | done | Dated dumps in `backups/`, restore into a scratch database, a row-count round trip, and the last-resort promotion documented and tested. Approved. |
-| M7 Postings and ledger core | not started | |
+| M7 Postings and ledger core | done | `Transaction` and `Posting` models, migration 0006, pure `core/ledger.py`, expense/income/transfer services, and the balance endpoint. Approved. |
 | M8 Manual transaction entry | not started | |
 | M9 Balance check and write-off | not started | |
 | M10 Categories | not started | |
@@ -34,18 +34,17 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M4 (accounts CRUD, interest rates), M5 (accounts screen, editor, seed command) and M6 (backup and
-restore) are built and on `main`; M5 was split into M5a, M5b and M5c during plan review.
-**M7 (postings and the ledger core) is next**: the first milestone where money actually moves, so its
-tests are written before the code, as MILESTONES.md requires.
+M4, M5 (a/b/c), M6 and M7 (postings and the ledger core) are built and on `main`. **M8 (manual
+transaction entry) is next**: the first screen where spending can be recorded by hand and a balance
+can be watched moving, and the point from which the two-week Phase 0 gate can realistically begin.
 
-Three things before the app holds real data:
+Before the app holds real data:
 
 - Running `seed` for real needs the 12 values only the user can give: for each of the six accounts, the
   balance that was true on a start date, and that date. Nothing else blocks it.
-- The development database holds the six placeholder accounts from `seed --demo`, plus rows left by the
-  milestone checks. `seed --remove-demo` clears the placeholders; `docker compose down -v` clears
-  everything.
+- The development database was rebuilt from empty in M7 and holds two accounts (SBI, Central Bank) and
+  three transactions recorded through the services. `seed --demo` restores the six placeholders;
+  `docker compose down -v` clears everything.
 - Take a backup before any risky change: `./scripts/backup.sh`.
 
 ## Open questions
