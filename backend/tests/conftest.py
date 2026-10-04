@@ -2,11 +2,15 @@
 
 import os
 from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from app.models import User
 
 
 def pytest_configure() -> None:
@@ -38,6 +42,14 @@ def db() -> Iterator[Session]:
         yield session
 
 
+@pytest.fixture
+def user(db: Session) -> "User":
+    """A persisted user, for tests that need an owner."""
+    from app.services.auth import create_user
+
+    return create_user(db, "owner@example.com", "s3cret-passphrase")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _test_database_schema() -> None:
     """Bring the test database schema to head once, before the suite runs."""
@@ -57,5 +69,7 @@ def _empty_tables() -> None:
 
     with engine.begin() as connection:
         connection.execute(
-            text("TRUNCATE TABLE sessions, users, login_failures RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE TABLE sessions, users, login_failures, accounts RESTART IDENTITY CASCADE"
+            )
         )

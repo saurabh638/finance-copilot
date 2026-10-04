@@ -3,7 +3,7 @@
 from fastapi import Depends, FastAPI
 
 from app.api.deps import enforce_auth
-from app.api.v1 import auth, health
+from app.api.v1 import accounts, auth, health
 
 
 def create_app() -> FastAPI:
@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(accounts.router, prefix="/api/v1")
     return app
 
 
