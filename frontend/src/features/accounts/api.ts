@@ -6,11 +6,12 @@
  */
 
 import type { components } from '../../lib/api-types'
-import { requestJson } from '../../lib/api'
+import { requestJson, requestNoContent } from '../../lib/api'
 
 export type Account = components['schemas']['AccountResponse']
 export type AccountCreate = components['schemas']['AccountCreate']
 export type AccountType = components['schemas']['AccountType']
+export type AccountUpdate = components['schemas']['AccountUpdate']
 export type CaptureMode = components['schemas']['CaptureMode']
 export type InterestRate = components['schemas']['InterestRateResponse']
 export type InterestRateCreate = components['schemas']['InterestRateCreate']
@@ -36,5 +37,25 @@ export function createRate(accountId: number, payload: InterestRateCreate): Prom
   return requestJson<InterestRate>(`${ACCOUNTS_PATH}/${accountId}/interest-rates`, {
     method: 'POST',
     body: JSON.stringify(payload),
+  })
+}
+
+/** Change an account's editable fields. `type` is not among them. */
+export function updateAccount(accountId: number, payload: AccountUpdate): Promise<Account> {
+  return requestJson<Account>(`${ACCOUNTS_PATH}/${accountId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+/** The account's dated rates, newest first. */
+export function fetchRates(accountId: number): Promise<InterestRate[]> {
+  return requestJson<InterestRate[]>(`${ACCOUNTS_PATH}/${accountId}/interest-rates`)
+}
+
+/** Soft-delete a rate, which frees its start date for a corrected record. */
+export function deleteRate(accountId: number, rateId: number): Promise<void> {
+  return requestNoContent(`${ACCOUNTS_PATH}/${accountId}/interest-rates/${rateId}`, {
+    method: 'DELETE',
   })
 }

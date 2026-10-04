@@ -76,3 +76,11 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
   }
   return (await response.json()) as T
 }
+
+/** Send a request that answers with no body, throwing a readable error. */
+export async function requestNoContent(path: string, init: RequestInit = {}): Promise<void> {
+  const response = await send(path, init)
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+}
