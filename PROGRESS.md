@@ -15,7 +15,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M5a Accounts screen: list and add | done | Accounts page, add form, money text parsed to paise in the frontend, API types generated from the schema. Approved. |
 | M5b Edit an account and its rate history | done | Inline editor per account: change the settings (type shown fixed), append dated rates, remove one only after a confirmation. Approved. |
 | M5c Interactive seed command | done | `seed` asks for each account's balance and start date, skips what already exists, and offers `--demo` / `--remove-demo`. Approved. |
-| M6 Backup and restore | not started | |
+| M6 Backup and restore | done | Dated dumps in `backups/`, restore into a scratch database, a row-count round trip, and the last-resort promotion documented and tested. Approved. |
 | M7 Postings and ledger core | not started | |
 | M8 Manual transaction entry | not started | |
 | M9 Balance check and write-off | not started | |
@@ -34,15 +34,19 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M4 (accounts CRUD, interest rates) and M5 (accounts screen, editor, seed command) are built and on
-`main`; M5 was split into M5a, M5b and M5c during plan review. **M6 (backup and restore) is next.**
+M4 (accounts CRUD, interest rates), M5 (accounts screen, editor, seed command) and M6 (backup and
+restore) are built and on `main`; M5 was split into M5a, M5b and M5c during plan review.
+**M7 (postings and the ledger core) is next**: the first milestone where money actually moves, so its
+tests are written before the code, as MILESTONES.md requires.
 
-Two things before the app holds real data:
+Three things before the app holds real data:
 
 - Running `seed` for real needs the 12 values only the user can give: for each of the six accounts, the
   balance that was true on a start date, and that date. Nothing else blocks it.
-- The development database currently holds the six placeholder accounts from `seed --demo`.
-  `seed --remove-demo` clears them, and they do not block a real run, which uses the plain names.
+- The development database holds the six placeholder accounts from `seed --demo`, plus rows left by the
+  milestone checks. `seed --remove-demo` clears the placeholders; `docker compose down -v` clears
+  everything.
+- Take a backup before any risky change: `./scripts/backup.sh`.
 
 ## Open questions
 
