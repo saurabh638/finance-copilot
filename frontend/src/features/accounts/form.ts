@@ -1,7 +1,7 @@
 /** The account form's values, its rules, and the payload they produce. */
 
-import { parsePaise } from '../../lib/money'
-import type { AccountType, CaptureMode, RateFrequency } from './api'
+import { formatPaise, parsePaise } from '../../lib/money'
+import type { Account, AccountType, AccountUpdate, CaptureMode, RateFrequency } from './api'
 import type { NewAccount } from './useAccounts'
 
 /**
@@ -73,6 +73,11 @@ export type AccountFormErrors = Partial<Record<keyof AccountFormValues, string>>
 // Up to three digits before the point and four after: NUMERIC(7, 4) on the server.
 const RATE_PATTERN = /^\d{1,3}(\.\d{1,4})?$/
 
+/** True when the text is a rate the server will accept. */
+export function isValidRateText(text: string): boolean {
+  return RATE_PATTERN.test(text.trim())
+}
+
 /** The server's rules, so a payload it would reject never leaves the form. */
 export function validateAccountForm(values: AccountFormValues): AccountFormErrors {
   const errors: AccountFormErrors = {}
@@ -110,7 +115,7 @@ export function validateAccountForm(values: AccountFormValues): AccountFormError
     }
   }
 
-  if (values.rate.trim() !== '' && !RATE_PATTERN.test(values.rate.trim())) {
+  if (values.rate.trim() !== '' && !isValidRateText(values.rate)) {
     errors.rate = 'Use up to four decimals, like 7.1000'
   }
 
@@ -131,8 +136,8 @@ export function toNewAccount(values: AccountFormValues): NewAccount {
       parent_id: isPot ? Number(values.parent_id) : null,
       opening_balance_paise: parsePaise(values.opening_balance),
       opening_date: values.opening_date,
-      statement_day: isCard ? Number(values.statement_day) : null,
-      due_day: isCard ? Number(values.due_day) : null,
+      statement_day: isCard ? dayOrNull(values.statement_day) : null,
+      due_day: isCard ? dayOrNull(values.due_day) : null,
       is_active: true,
     },
     // The rate starts on the account's opening date, so no date is asked twice.
@@ -148,4 +153,50 @@ function isDayOfMonth(text: string): boolean {
   }
   const day = Number(text)
   return Number.isInteger(day) && day >= 1 && day <= 31
+}
+
+/** An optional day of the month: empty text means "not set", never day zero. */
+function dayOrNull(text: string): number | null {
+  return text === '' ? null : Number(text)
+}
+
+/** Seed the edit form from an account, so each field shows what the API holds. */
+export function accountToFormValues(account: Account): AccountFormValues {
+  return {
+    name: account.name,
+    type: account.type,
+    capture_mode: account.capture_mode,
+    purpose: account.purpose ?? '',
+    parent_id: account.parent_id === null ? '' : String(account.parent_id),
+    // The formatter's output parses straight back to the same paise.
+    opening_balance: formatPaise(account.opening_balance_paise),
+    opening_date: account.opening_date,
+    statement_day: account.statement_day === null ? '' : String(account.statement_day),
+    due_day: account.due_day === null ? '' : String(account.due_day),
+    rate: '',
+    frequency: 'quarterly',
+  }
+}
+
+/**
+ * The editable fields as PATCH expects them.
+ *
+ * `type` is deliberately absent: the server will not change it, because postings
+ * and importers key off it. The form shows it read-only for the same reason.
+ */
+export function toAccountUpdate(values: AccountFormValues, isActive: boolean): AccountUpdate {
+  const isCard = values.type === 'credit_card'
+  const isPot = values.type === 'pot'
+
+  return {
+    name: values.name.trim(),
+    purpose: values.purpose.trim() === '' ? null : values.purpose.trim(),
+    capture_mode: values.capture_mode,
+    parent_id: isPot ? Number(values.parent_id) : null,
+    opening_balance_paise: parsePaise(values.opening_balance),
+    opening_date: values.opening_date,
+    statement_day: isCard ? dayOrNull(values.statement_day) : null,
+    due_day: isCard ? dayOrNull(values.due_day) : null,
+    is_active: isActive,
+  }
 }

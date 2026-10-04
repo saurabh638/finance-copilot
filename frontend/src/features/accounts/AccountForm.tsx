@@ -1,14 +1,9 @@
 import { type FormEvent, useState } from 'react'
 
 import type { Account } from './api'
+import AccountFields from './AccountFields'
 import RateFields from './RateFields'
-import SelectField from './SelectField'
-import TextField from './TextField'
 import {
-  ACCOUNT_TYPES,
-  ACCOUNT_TYPE_LABELS,
-  CAPTURE_MODES,
-  CAPTURE_MODE_LABELS,
   EMPTY_ACCOUNT_FORM,
   type AccountFormErrors,
   type AccountFormValues,
@@ -35,14 +30,6 @@ export default function AccountForm({
   const [values, setValues] = useState<AccountFormValues>(EMPTY_ACCOUNT_FORM)
   const [errors, setErrors] = useState<AccountFormErrors>({})
 
-  const isCard = values.type === 'credit_card'
-  const isPot = values.type === 'pot'
-  const parentOptions = ['', ...parents.map((account) => String(account.id))]
-  const parentLabels = {
-    '': 'Choose an account',
-    ...Object.fromEntries(parents.map((account) => [String(account.id), account.name])),
-  }
-
   function change<K extends keyof AccountFormValues>(field: K, value: AccountFormValues[K]): void {
     setValues((current) => ({ ...current, [field]: value }))
   }
@@ -66,86 +53,13 @@ export default function AccountForm({
         </p>
       )}
 
-      <TextField
-        label="Name"
-        id="account-name"
-        value={values.name}
-        error={errors.name}
-        onChange={(value) => change('name', value)}
+      <AccountFields
+        values={values}
+        errors={errors}
+        parents={parents}
+        isTypeEditable
+        onChange={change}
       />
-      <SelectField
-        label="Type"
-        id="account-type"
-        value={values.type}
-        options={ACCOUNT_TYPES}
-        labels={ACCOUNT_TYPE_LABELS}
-        onChange={(value) => change('type', value)}
-      />
-      <SelectField
-        label="Capture mode"
-        id="account-capture_mode"
-        value={values.capture_mode}
-        options={CAPTURE_MODES}
-        labels={CAPTURE_MODE_LABELS}
-        onChange={(value) => change('capture_mode', value)}
-      />
-      <TextField
-        label="Purpose (optional)"
-        id="account-purpose"
-        value={values.purpose}
-        error={errors.purpose}
-        onChange={(value) => change('purpose', value)}
-      />
-
-      {isPot && (
-        <SelectField
-          label="Parent account"
-          id="account-parent_id"
-          value={values.parent_id}
-          options={parentOptions}
-          labels={parentLabels}
-          error={errors.parent_id}
-          onChange={(value) => change('parent_id', value)}
-        />
-      )}
-
-      <TextField
-        label="Opening balance"
-        id="account-opening_balance"
-        value={values.opening_balance}
-        error={errors.opening_balance}
-        inputMode="decimal"
-        onChange={(value) => change('opening_balance', value)}
-      />
-      <TextField
-        label="Opening date"
-        id="account-opening_date"
-        value={values.opening_date}
-        error={errors.opening_date}
-        type="date"
-        onChange={(value) => change('opening_date', value)}
-      />
-
-      {isCard && (
-        <>
-          <TextField
-            label="Statement day"
-            id="account-statement_day"
-            value={values.statement_day}
-            error={errors.statement_day}
-            inputMode="numeric"
-            onChange={(value) => change('statement_day', value)}
-          />
-          <TextField
-            label="Due day"
-            id="account-due_day"
-            value={values.due_day}
-            error={errors.due_day}
-            inputMode="numeric"
-            onChange={(value) => change('due_day', value)}
-          />
-        </>
-      )}
 
       <RateFields
         rate={values.rate}
