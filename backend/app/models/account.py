@@ -1,7 +1,6 @@
 """Account model: the banks, cards, wallets and pots money lives in."""
 
 from datetime import date, datetime
-from enum import Enum
 
 from sqlalchemy import (
     BigInteger,
@@ -17,18 +16,7 @@ from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import AccountType, CaptureMode
-
-
-def _enum_values(enum_class: type[Enum]) -> list[str]:
-    """Persist the lower-case enum values rather than the member names."""
-    return [str(member.value) for member in enum_class]
-
-
-def _allowed_values(column: str, enum_class: type[Enum]) -> str:
-    """A SQL ``IN`` list for an enum column, so the database rejects bad values."""
-    allowed = ", ".join(f"'{member.value}'" for member in enum_class)
-    return f"{column} IN ({allowed})"
+from app.models.enums import AccountType, CaptureMode, allowed_values, enum_values
 
 
 class Account(TimestampMixin, Base):
@@ -36,9 +24,9 @@ class Account(TimestampMixin, Base):
 
     __tablename__ = "accounts"
     __table_args__ = (
-        CheckConstraint(_allowed_values("type", AccountType), name="ck_accounts_type"),
+        CheckConstraint(allowed_values("type", AccountType), name="ck_accounts_type"),
         CheckConstraint(
-            _allowed_values("capture_mode", CaptureMode),
+            allowed_values("capture_mode", CaptureMode),
             name="ck_accounts_capture_mode",
         ),
         CheckConstraint(
@@ -63,7 +51,7 @@ class Account(TimestampMixin, Base):
             AccountType,
             native_enum=False,
             length=20,
-            values_callable=_enum_values,
+            values_callable=enum_values,
         ),
         nullable=False,
     )
@@ -73,7 +61,7 @@ class Account(TimestampMixin, Base):
             CaptureMode,
             native_enum=False,
             length=20,
-            values_callable=_enum_values,
+            values_callable=enum_values,
         ),
         nullable=False,
     )
