@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:api": "npx --yes openapi-typescript@7.13.0 http://backend:8000/openapi.json -o src/lib/api-types.ts && prettier --write src/lib/api-types.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

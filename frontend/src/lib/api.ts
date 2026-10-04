@@ -62,3 +62,17 @@ export async function logout(): Promise<void> {
     throw new Error(await errorMessage(response))
   }
 }
+
+/**
+ * Send a request and return its parsed body, throwing a readable error.
+ *
+ * The caller supplies the type; it comes from the generated OpenAPI schema
+ * (`lib/api-types.ts`), so nothing here hand-writes a server shape.
+ */
+export async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await send(path, init)
+  if (!response.ok) {
+    throw new Error(await errorMessage(response))
+  }
+  return (await response.json()) as T
+}
