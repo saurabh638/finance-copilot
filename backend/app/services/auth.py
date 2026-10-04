@@ -40,6 +40,11 @@ def create_user(db: DbSession, email: str, password: str) -> User:
     return user
 
 
+def find_user(db: DbSession, email: str) -> User | None:
+    """Return the user with this email, or None. The email is matched lower-cased."""
+    return db.scalar(select(User).where(User.email == email.strip().lower()))
+
+
 def authenticate(db: DbSession, email: str, password: str) -> User | None:
     """Return the user when the email and password match, otherwise None."""
     normalised = email.strip().lower()
