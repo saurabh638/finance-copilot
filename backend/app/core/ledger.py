@@ -8,7 +8,7 @@ It also holds the balance check: what the bank says against what the ledger says
 and the figures that decide whether a write-off is worth a second look.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -62,16 +62,60 @@ def transfer_amounts(amount_paise: int) -> tuple[int, int]:
 def is_balanced(amounts: Sequence[int]) -> bool:
     """True when a transaction's postings are a complete set.
 
-    One posting is an external flow - an expense or an income - and is balanced
-    by definition: its other side is the world outside the app, not an account.
-    Two or more postings are an internal movement and must sum to zero. A
+    Three shapes are accepted, and no others. One posting is an external flow -
+    an expense or an income - and is balanced by definition: its other side is
+    the world outside the app, not an account. Two or more postings that sum to
+    zero are an internal movement: a transfer, or anything else that stays
+    inside. Two or more postings of a single sign are one external flow split
+    between categories, which is the same money counted once, twice over. A
     transaction with no postings is never balanced.
     """
     if len(amounts) == 0:
         return False
     if len(amounts) == 1:
         return True
-    return sum_paise(amounts) == 0
+    if sum_paise(amounts) == 0:
+        return True
+    return all(amount > 0 for amount in amounts) or all(amount < 0 for amount in amounts)
+
+
+def parts_make_whole(total_paise: int, parts_paise: Sequence[int]) -> bool:
+    """True when a split's parts are exactly the amount the user stated.
+
+    Both are magnitudes: the sign belongs to the kind of the movement, so an
+    expense of ₹500 splits into ₹300 and ₹200 and nothing else. A split needs at
+    least two parts, since one part is simply the whole, and the parts must add
+    up exactly: a paise gained or lost here would quietly unbalance the ledger.
+    """
+    if total_paise < 0 or any(part < 0 for part in parts_paise):
+        raise ValueError("a split is stated in magnitudes, not signs")
+    if len(parts_paise) < 2:
+        return False
+    return sum_paise(parts_paise) == total_paise
+
+
+def roll_up(
+    parents: Mapping[int, int | None],
+    direct_paise: Mapping[int, int],
+) -> dict[int, int]:
+    """Each category's total: what was filed under it, and under all of its children.
+
+    `parents` says where each category sits, and `direct_paise` says what was
+    filed under it by name. Every amount is added to its category and to each
+    category above it, so a group's figure is the whole of what is beneath it.
+    Spending filed under a category that is not in the tree is nobody's, and is
+    left out; a cycle would be a tree we cannot read, and is cut off after one
+    pass rather than looped over.
+    """
+    totals = dict.fromkeys(parents, 0)
+    for category_id, amount_paise in direct_paise.items():
+        above: int | None = category_id
+        for _ in range(len(parents)):
+            if above is None or above not in totals:
+                break
+            totals[above] = add_paise(totals[above], amount_paise)
+            above = parents.get(above)
+    return totals
 
 
 def difference_paise(computed_paise: int, stated_paise: int) -> int:
