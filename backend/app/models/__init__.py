@@ -1,6 +1,7 @@
 """SQLAlchemy models. Importing this package registers every table."""
 
 from app.models.account import Account
+from app.models.balance_check import BalanceCheck
 from app.models.base import Base
 from app.models.enums import (
     AccountType,
@@ -19,6 +20,7 @@ from app.models.user import User
 __all__ = [
     "Account",
     "AccountType",
+    "BalanceCheck",
     "Base",
     "CaptureMode",
     "InterestRate",
