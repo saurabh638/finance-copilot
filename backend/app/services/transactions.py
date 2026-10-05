@@ -16,12 +16,20 @@ from app.core.ledger import (
     DatedAmount,
     balance_paise,
     is_balanced,
+    parts_make_whole,
     sum_paise,
     transfer_amounts,
 )
-from app.models import Account, Posting, PostingKind, Transaction, TransactionSource
-from app.schemas.transaction import TransactionUpdate
+from app.models import Account, CategoryKind, Posting, PostingKind, Transaction, TransactionSource
+from app.schemas.transaction import SplitPartCreate, TransactionUpdate
 from app.services.accounts import get_account
+from app.services.categories import (
+    UNACCOUNTED,
+    UNRECORDED_INCOME,
+    find_by_name,
+    get_category,
+    kind_word,
+)
 
 
 class TransactionNotFoundError(LookupError):
@@ -43,6 +51,112 @@ class BalanceBreakdown:
     balance_paise: int
 
 
+@dataclass(frozen=True)
+class Movement:
+    """One posting about to be written: which account, how much, and what it is."""
+
+    account_id: int
+    amount_paise: int
+    kind: PostingKind
+    category_id: int | None = None
+
+
+# Only spending and earning have categories the user chooses. A transfer moves
+# money without spending it, and a write-off's filing is chosen for it.
+_CATEGORY_KINDS: dict[PostingKind, CategoryKind] = {
+    PostingKind.EXPENSE: CategoryKind.EXPENSE,
+    PostingKind.INCOME: CategoryKind.INCOME,
+    PostingKind.ADJUSTMENT: CategoryKind.ADJUSTMENT,
+}
+
+
+def _file_under(
+    db: DbSession, user_id: int, category_id: int | None, kind: PostingKind
+) -> int | None:
+    """The category a posting goes under, refusing one that means something else."""
+    if category_id is None:
+        return None
+
+    expected = _CATEGORY_KINDS.get(kind)
+    if expected is None:
+        raise InvalidTransactionError(f"a {kind.value} is not filed under a category")
+
+    category = get_category(db, user_id, category_id)
+    if category.kind is not expected:
+        raise InvalidTransactionError(
+            f"{category.name} is for {kind_word(category.kind)}, not {kind_word(expected)}"
+        )
+    return category.id
+
+
+def _write_off_filing(db: DbSession, user_id: int, amount_paise: int) -> int | None:
+    """What a write-off files itself under: the tree's name for its direction.
+
+    Money short is spending that went unrecorded; money found is income that went
+    unrecorded. The names are the user's to rename or remove and a check must
+    always be recordable, so a name that is gone simply leaves the write-off
+    unfiled.
+    """
+    name = UNRECORDED_INCOME if amount_paise > 0 else UNACCOUNTED
+    category = find_by_name(db, user_id, name, kind=CategoryKind.ADJUSTMENT)
+    return None if category is None else category.id
+
+
+# The sign a kind gives the amount the user states as a positive figure.
+_DIRECTIONS: dict[PostingKind, int] = {
+    PostingKind.EXPENSE: -1,
+    PostingKind.INCOME: 1,
+}
+
+
+def _movements(
+    db: DbSession,
+    user_id: int,
+    account_id: int,
+    amount_paise: int,
+    kind: PostingKind,
+    category_id: int | None,
+    parts: Sequence[SplitPartCreate] | None,
+) -> list[Movement]:
+    """The postings one movement becomes: one, or one per part when it was split.
+
+    Both sides of a split sit on the same account, because they are one payment
+    out of one place; splitting it across accounts would count the money twice.
+    """
+    direction = _DIRECTIONS.get(kind)
+    if direction is None:
+        raise InvalidTransactionError(f"a {kind.value} is not filed under a category")
+
+    if parts is None:
+        return [
+            Movement(
+                account_id,
+                direction * amount_paise,
+                kind,
+                _file_under(db, user_id, category_id, kind),
+            )
+        ]
+
+    if category_id is not None:
+        raise InvalidTransactionError("filed under a category or under parts, not both")
+
+    amounts = [part.amount_paise for part in parts]
+    if not parts_make_whole(amount_paise, amounts):
+        raise InvalidTransactionError(
+            f"the parts must add up to {amount_paise} paise in two parts or more, got {amounts}"
+        )
+
+    return [
+        Movement(
+            account_id,
+            direction * part.amount_paise,
+            kind,
+            _file_under(db, user_id, part.category_id, kind),
+        )
+        for part in parts
+    ]
+
+
 def record_expense(
     db: DbSession,
     user_id: int,
@@ -51,8 +165,14 @@ def record_expense(
     on: date,
     merchant: str | None = None,
     note: str | None = None,
+    category_id: int | None = None,
+    parts: Sequence[SplitPartCreate] | None = None,
 ) -> Transaction:
-    """Record money leaving an account. Give the amount as a positive number."""
+    """Record money leaving an account. Give the amount as a positive number.
+
+    One purchase may really be several things, so it can be split into parts
+    instead of filed under a single category.
+    """
     _require_positive(amount_paise)
     account = get_account(db, user_id, account_id)
     require_on_or_after_opening(account, on)
@@ -61,7 +181,7 @@ def record_expense(
         db,
         user_id,
         on,
-        [(account.id, -amount_paise, PostingKind.EXPENSE)],
+        _movements(db, user_id, account.id, amount_paise, PostingKind.EXPENSE, category_id, parts),
         merchant=merchant,
         note=note,
     )
@@ -75,6 +195,8 @@ def record_income(
     on: date,
     merchant: str | None = None,
     note: str | None = None,
+    category_id: int | None = None,
+    parts: Sequence[SplitPartCreate] | None = None,
 ) -> Transaction:
     """Record money arriving. Give the amount as a positive number."""
     _require_positive(amount_paise)
@@ -85,7 +207,7 @@ def record_income(
         db,
         user_id,
         on,
-        [(account.id, amount_paise, PostingKind.INCOME)],
+        _movements(db, user_id, account.id, amount_paise, PostingKind.INCOME, category_id, parts),
         merchant=merchant,
         note=note,
     )
@@ -116,8 +238,8 @@ def record_transfer(
         user_id,
         on,
         [
-            (source.id, out_of_source, PostingKind.TRANSFER),
-            (destination.id, into_destination, PostingKind.TRANSFER),
+            Movement(source.id, out_of_source, PostingKind.TRANSFER),
+            Movement(destination.id, into_destination, PostingKind.TRANSFER),
         ],
         note=note,
     )
@@ -148,7 +270,14 @@ def record_adjustment(
         db,
         user_id,
         on,
-        [(account.id, amount_paise, PostingKind.ADJUSTMENT)],
+        [
+            Movement(
+                account.id,
+                amount_paise,
+                PostingKind.ADJUSTMENT,
+                _write_off_filing(db, user_id, amount_paise),
+            )
+        ],
         note=note,
     )
 
@@ -204,7 +333,7 @@ def _record(
     db: DbSession,
     user_id: int,
     on: date,
-    movements: Sequence[tuple[int, int, PostingKind]],
+    movements: Sequence[Movement],
     *,
     merchant: str | None = None,
     note: str | None = None,
@@ -214,7 +343,7 @@ def _record(
     The postings are checked against the ledger's rule before anything is
     written, so a half-written movement is not possible.
     """
-    amounts = [amount_paise for _, amount_paise, _ in movements]
+    amounts = [movement.amount_paise for movement in movements]
     if not is_balanced(amounts):
         raise InvalidTransactionError(
             f"postings must be one external flow or sum to zero, got {amounts}"
@@ -230,13 +359,14 @@ def _record(
     db.add(transaction)
     db.flush()
 
-    for account_id, amount_paise, kind in movements:
+    for movement in movements:
         db.add(
             Posting(
                 transaction_id=transaction.id,
-                account_id=account_id,
-                amount_paise=amount_paise,
-                kind=kind,
+                account_id=movement.account_id,
+                amount_paise=movement.amount_paise,
+                kind=movement.kind,
+                category_id=movement.category_id,
             )
         )
     db.commit()
@@ -374,6 +504,15 @@ def update_transaction(
                 "delete it and record it again"
             )
         postings[0].amount_paise = _signed_amount(postings[0].kind, changes.amount_paise)
+
+    # Filing is a property of the posting, so it too needs a single posting to
+    # be unambiguous: a transfer's two sides are one movement, not two.
+    if "category_id" in changes.model_fields_set:
+        if len(postings) != 1:
+            raise InvalidTransactionError(
+                "a category can only be changed for a transaction with one posting"
+            )
+        postings[0].category_id = _file_under(db, user_id, changes.category_id, postings[0].kind)
 
     db.commit()
     return transaction

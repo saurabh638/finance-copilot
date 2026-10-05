@@ -10,12 +10,14 @@ decision, not a gap to be filled in again.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as DbSession
 
-from app.models import Category, CategoryKind, Posting
+from app.core.ledger import roll_up
+from app.core.money import add_paise
+from app.models import Category, CategoryKind, Posting, PostingKind, Transaction
 
 NAME_MAX = 80
 
@@ -36,6 +38,34 @@ class InvalidCategoryError(ValueError):
 
 class CategoryInUseError(ValueError):
     """Raised when something still points at a category that cannot be removed."""
+
+
+KIND_WORDS: dict[CategoryKind, str] = {
+    CategoryKind.EXPENSE: "spending",
+    CategoryKind.INCOME: "earning",
+    CategoryKind.ADJUSTMENT: "write-offs",
+}
+
+
+def kind_word(kind: CategoryKind) -> str:
+    """How a category's kind reads in a sentence."""
+    return KIND_WORDS[kind]
+
+
+@dataclass(frozen=True)
+class CategorySpend:
+    """One row of the spend report: what a category holds, and all of its own.
+
+    `id` and the fields beside it are the category as the API returns it, so a
+    client can draw the same tree it already has and read the figures off it.
+    """
+
+    id: int
+    name: str
+    parent_id: int | None
+    kind: CategoryKind
+    direct_paise: int
+    total_paise: int
 
 
 @dataclass(frozen=True)
@@ -136,6 +166,68 @@ def list_categories(db: DbSession, user_id: int) -> list[Category]:
     return ordered
 
 
+def spend_by_category(
+    db: DbSession,
+    user_id: int,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> list[CategorySpend]:
+    """What was spent under each expense category in a period, children rolled in.
+
+    Spending is the expense postings filed under a category: income is not
+    spending, a transfer spends nothing, and a write-off has its own report. The
+    figures come from the postings rather than from any stored total, so a
+    correction to a movement shows up here the moment it is made. Spending filed
+    under no category is counted nowhere, because there is no row for it.
+    """
+    rows = db.execute(_live_spending(user_id, from_date, to_date))
+    direct: dict[int, int] = {}
+    for category_id, amount_paise in rows:
+        # The query already excludes filings with no category; saying so again
+        # keeps that a fact the types can read as well.
+        if category_id is not None:
+            # Postings of an expense are negative; the report speaks in magnitudes.
+            direct[category_id] = add_paise(direct.get(category_id, 0), -amount_paise)
+
+    categories = [row for row in list_categories(db, user_id) if row.kind is CategoryKind.EXPENSE]
+    totals = roll_up({row.id: row.parent_id for row in categories}, direct)
+
+    return [
+        CategorySpend(
+            id=row.id,
+            name=row.name,
+            parent_id=row.parent_id,
+            kind=row.kind,
+            direct_paise=direct.get(row.id, 0),
+            total_paise=totals.get(row.id, 0),
+        )
+        for row in categories
+    ]
+
+
+def _live_spending(
+    user_id: int, from_date: date | None, to_date: date | None
+) -> Select[int | None, int]:
+    """One row per live expense posting filed under a category: that category, and
+    the amount as it was recorded."""
+    statement = (
+        select(Posting.category_id, Posting.amount_paise)
+        .join(Transaction, Posting.transaction_id == Transaction.id)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.deleted_at.is_(None),
+            Posting.deleted_at.is_(None),
+            Posting.kind == PostingKind.EXPENSE,
+            Posting.category_id.is_not(None),
+        )
+    )
+    if from_date is not None:
+        statement = statement.where(Transaction.transaction_date >= from_date)
+    if to_date is not None:
+        statement = statement.where(Transaction.transaction_date <= to_date)
+    return statement
+
+
 def seed_defaults(db: DbSession, user_id: int) -> list[Category]:
     """Create the default set for a user whose tree is empty.
 
@@ -180,6 +272,21 @@ def get_category(db: DbSession, user_id: int, category_id: int) -> Category:
     if found is None:
         raise CategoryNotFoundError(category_id)
     return found
+
+
+def find_by_name(db: DbSession, user_id: int, name: str, kind: CategoryKind) -> Category | None:
+    """A live category with this exact name and kind, or None.
+
+    For names that are a convention rather than a requirement, such as the
+    balance check's write-off names: those are the user's to rename or remove,
+    so a missing one is an answer here rather than an error. A top-level name
+    wins, because that is where the tree puts its own.
+    """
+    statement = _live_categories(user_id).where(Category.name == name, Category.kind == kind)
+    top_level = db.scalars(statement.where(Category.parent_id.is_(None))).first()
+    if top_level is not None:
+        return top_level
+    return db.scalars(statement.order_by(Category.id)).first()
 
 
 def _clean_name(name: str) -> str:

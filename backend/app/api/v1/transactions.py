@@ -22,6 +22,7 @@ from app.schemas.transaction import (
 )
 from app.services import transactions
 from app.services.accounts import AccountNotFoundError
+from app.services.categories import CategoryNotFoundError
 from app.services.transactions import (
     InvalidTransactionError,
     TransactionDetail,
@@ -42,6 +43,14 @@ def _not_found(transaction_id: int) -> HTTPException:
 def _invalid(error: InvalidTransactionError) -> HTTPException:
     """A rule that needs the database was broken by the request."""
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+def _category_not_found(error: CategoryNotFoundError) -> HTTPException:
+    """The same 404 as an account, so a category that is gone reads the same way."""
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Category {error} does not exist or is no longer in use",
+    )
 
 
 def _response(detail: TransactionDetail) -> TransactionResponse:
@@ -91,6 +100,8 @@ def create(
                 payload.transaction_date,
                 payload.merchant,
                 payload.note,
+                payload.category_id,
+                payload.parts,
             )
         else:
             transaction = transactions.record_expense(
@@ -101,6 +112,8 @@ def create(
                 payload.transaction_date,
                 payload.merchant,
                 payload.note,
+                payload.category_id,
+                payload.parts,
             )
         detail = transactions.transaction_detail(db, user.id, transaction.id)
     except AccountNotFoundError as error:
@@ -108,6 +121,8 @@ def create(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Account {error} does not exist or is no longer in use",
         ) from error
+    except CategoryNotFoundError as error:
+        raise _category_not_found(error) from error
     except InvalidTransactionError as error:
         raise _invalid(error) from error
 
@@ -174,12 +189,14 @@ def patch(
     db: Session = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TransactionResponse:
-    """Change the date, merchant, note, or the amount of a single posting."""
+    """Change the date, merchant, note, the amount, or the filing of a movement."""
     try:
         transactions.update_transaction(db, user.id, transaction_id, payload)
         detail = transactions.transaction_detail(db, user.id, transaction_id)
     except TransactionNotFoundError as error:
         raise _not_found(transaction_id) from error
+    except CategoryNotFoundError as error:
+        raise _category_not_found(error) from error
     except InvalidTransactionError as error:
         raise _invalid(error) from error
     return _response(detail)

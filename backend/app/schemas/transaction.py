@@ -30,20 +30,37 @@ class MovementBase(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
-class ExpenseCreate(MovementBase):
+class SplitPartCreate(BaseModel):
+    """One part of a movement the user split between categories."""
+
+    amount_paise: int = Field(gt=0)
+    category_id: int
+
+
+class OneAccountMovement(MovementBase):
+    """Money leaving or arriving at one account.
+
+    The amount is the figure the statement shows. A movement is filed under one
+    category, or - when one purchase was really several things - split into
+    parts, which must add up to the amount exactly. The two are not mixed.
+    """
+
+    account_id: int
+    amount_paise: int = Field(gt=0)
+    category_id: int | None = None
+    parts: list[SplitPartCreate] | None = None
+
+
+class ExpenseCreate(OneAccountMovement):
     """Money leaving one account. The amount is positive; the kind sets the sign."""
 
     kind: Literal["expense"]
-    account_id: int
-    amount_paise: int = Field(gt=0)
 
 
-class IncomeCreate(MovementBase):
+class IncomeCreate(OneAccountMovement):
     """Money arriving in one account."""
 
     kind: Literal["income"]
-    account_id: int
-    amount_paise: int = Field(gt=0)
 
 
 class TransferCreate(MovementBase):
@@ -66,15 +83,16 @@ MovementCreate = Annotated[
 class TransactionUpdate(BaseModel):
     """What may change. The accounts and the kind never do.
 
-    An omitted field is left alone; an explicit null clears it. The amount may
-    only be changed when the transaction has a single posting, because a transfer
-    is two postings that must keep summing to zero.
+    An omitted field is left alone; an explicit null clears it. The amount and
+    the category may only be changed when the transaction has a single posting,
+    because a transfer is two postings that must keep summing to zero.
     """
 
     transaction_date: date | None = None
     merchant: str | None = Field(default=None, max_length=120)
     note: str | None = Field(default=None, max_length=500)
     amount_paise: int | None = Field(default=None, gt=0)
+    category_id: int | None = None
 
 
 class PostingResponse(BaseModel):
@@ -86,6 +104,7 @@ class PostingResponse(BaseModel):
     account_id: int
     amount_paise: int
     kind: PostingKind
+    category_id: int | None
 
 
 class TransactionResponse(BaseModel):
