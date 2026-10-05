@@ -2,12 +2,18 @@ import { useState } from 'react'
 
 import PageHeader from '../../components/PageHeader'
 import { useAccounts } from '../accounts/useAccounts'
+import TransactionEditor from './TransactionEditor'
 import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
-import TransactionList from './TransactionList'
-import { NO_FILTER, type MovementCreate, type MovementFilter } from './api'
+import TransactionRow from './TransactionRow'
+import { NO_FILTER, type MovementCreate, type MovementFilter, type TransactionUpdate } from './api'
 import { todayIso } from './form'
-import { useCreateTransaction, useTransactions } from './useTransactions'
+import {
+  useCreateTransaction,
+  useDeleteTransaction,
+  useTransactions,
+  useUpdateTransaction,
+} from './useTransactions'
 
 interface TransactionsPageProps {
   /** Today, so that a test can hold the clock still. */
@@ -25,8 +31,14 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
   const [isRecording, setIsRecording] = useState(false)
   // Bumping the key remounts the form, which is how a saved one is cleared.
   const [formKey, setFormKey] = useState(0)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const movements = useTransactions(filter)
   const recordMovement = useCreateTransaction()
+  const updateMovement = useUpdateTransaction()
+  const deleteMovement = useDeleteTransaction()
 
   const list = accounts.data ?? []
   const names = new Map(list.map((account) => [account.id, account.name]))
@@ -37,6 +49,36 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
     recordMovement.mutate(payload, {
       onSuccess: () => {
         setFormKey((current) => current + 1)
+      },
+    })
+  }
+
+  function openEditor(transactionId: number): void {
+    setEditError(null)
+    setEditingId(editingId === transactionId ? null : transactionId)
+  }
+
+  function handleSave(transactionId: number, update: TransactionUpdate): void {
+    updateMovement.mutate(
+      { id: transactionId, update },
+      {
+        onSuccess: () => {
+          setEditingId(null)
+          setEditError(null)
+        },
+        onError: (error) => setEditError(error.message),
+      },
+    )
+  }
+
+  function handleDelete(transactionId: number): void {
+    setDeletingId(transactionId)
+    setDeleteError(null)
+    deleteMovement.mutate(transactionId, {
+      onSuccess: () => setDeletingId(null),
+      onError: (error) => {
+        setDeletingId(null)
+        setDeleteError(error.message)
       },
     })
   }
@@ -75,6 +117,12 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
         </p>
       )}
 
+      {deleteError !== null && (
+        <p role="alert" className="mt-4 rounded bg-red-50 px-3 py-2 text-red-800">
+          {deleteError}
+        </p>
+      )}
+
       {movements.isSuccess &&
         (shown.length === 0 ? (
           <p className="mt-6 text-slate-700">
@@ -83,7 +131,28 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
               : 'Nothing recorded yet. Record the first movement above.'}
           </p>
         ) : (
-          <TransactionList transactions={shown} names={names} />
+          <ul className="mt-4 divide-y divide-slate-200 overflow-hidden rounded border border-slate-200 bg-white">
+            {shown.map((transaction) => (
+              <TransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                names={names}
+                isEditing={editingId === transaction.id}
+                isDeleting={deletingId === transaction.id}
+                onEdit={() => openEditor(transaction.id)}
+                onDelete={() => handleDelete(transaction.id)}
+              >
+                {editingId === transaction.id && (
+                  <TransactionEditor
+                    transaction={transaction}
+                    onSave={(update) => handleSave(transaction.id, update)}
+                    isSaving={updateMovement.isPending}
+                    errorMessage={editError}
+                  />
+                )}
+              </TransactionRow>
+            ))}
+          </ul>
         ))}
 
       {movements.hasNextPage && (

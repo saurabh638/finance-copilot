@@ -6,7 +6,7 @@
  */
 
 import type { components } from '../../lib/api-types'
-import { requestJson } from '../../lib/api'
+import { requestJson, requestNoContent } from '../../lib/api'
 
 export type ExpenseCreate = components['schemas']['ExpenseCreate']
 export type IncomeCreate = components['schemas']['IncomeCreate']
@@ -74,4 +74,23 @@ export function createTransaction(payload: MovementCreate): Promise<Transaction>
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+/**
+ * Correct a movement.
+ *
+ * Only what is sent is changed, so an omitted field is left alone. The amount
+ * may only be sent when the movement has a single posting; the accounts and the
+ * kind can never change.
+ */
+export function updateTransaction(id: number, update: TransactionUpdate): Promise<Transaction> {
+  return requestJson<Transaction>(`${TRANSACTIONS_PATH}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(update),
+  })
+}
+
+/** Remove a movement. The record is kept; it stops counting towards the balance. */
+export function deleteTransaction(id: number): Promise<void> {
+  return requestNoContent(`${TRANSACTIONS_PATH}/${id}`, { method: 'DELETE' })
 }

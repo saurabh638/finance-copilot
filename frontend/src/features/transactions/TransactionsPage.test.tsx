@@ -1,12 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchSession } from '../../lib/api'
 import { fetchAccounts } from '../accounts/api'
 import type { Account } from '../accounts/api'
 import TransactionsPage from './TransactionsPage'
-import { PAGE_SIZE, createTransaction, fetchTransactions } from './api'
+import {
+  PAGE_SIZE,
+  createTransaction,
+  deleteTransaction,
+  fetchTransactions,
+  updateTransaction,
+} from './api'
 import type { Transaction } from './api'
 
 vi.mock('../../lib/api')
@@ -16,6 +22,8 @@ vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
   fetchTransactions: vi.fn(),
   createTransaction: vi.fn(),
+  updateTransaction: vi.fn(),
+  deleteTransaction: vi.fn(),
 }))
 
 const USER = { id: 1, email: 'owner@example.com' }
@@ -88,10 +96,13 @@ describe('TransactionsPage', () => {
 
     const rows = await screen.findAllByRole('listitem')
 
-    expect(rows.map((row) => row.textContent)).toEqual([
-      'Blinkit4 Oct 2026 · Money out · SBI-₹500.00',
-      'No description3 Oct 2026 · Transfer · SBI → Central Bank₹1,000.00',
-    ])
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent('Blinkit')
+    expect(rows[0]).toHaveTextContent('4 Oct 2026 · Money out · SBI')
+    expect(rows[0]).toHaveTextContent('-₹500.00')
+    expect(rows[1]).toHaveTextContent('No description')
+    expect(rows[1]).toHaveTextContent('3 Oct 2026 · Transfer · SBI → Central Bank')
+    expect(rows[1]).toHaveTextContent('₹1,000.00')
   })
 
   it('says so when nothing has been recorded', async () => {
@@ -211,5 +222,63 @@ describe('TransactionsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Hide the form' }))
     expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument()
+  })
+
+  it('corrects a movement in place, then closes the editor', async () => {
+    vi.mocked(fetchTransactions).mockResolvedValue([EXPENSE])
+    vi.mocked(updateTransaction).mockResolvedValue({ ...EXPENSE, note: 'bread' })
+    renderPage()
+    await screen.findByText('Blinkit')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByLabelText('Note (optional)'), { target: { value: 'bread' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(updateTransaction).toHaveBeenCalledWith(3, { note: 'bread' }))
+    await waitFor(() => expect(screen.queryByLabelText('Date')).not.toBeInTheDocument())
+  })
+
+  it('shows why a correction was refused, and keeps it open', async () => {
+    vi.mocked(fetchTransactions).mockResolvedValue([EXPENSE])
+    vi.mocked(updateTransaction).mockRejectedValue(
+      new Error('SBI opened on 2026-04-01, so 2026-03-31 is too early'),
+    )
+    renderPage()
+    await screen.findByText('Blinkit')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-03-31' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('SBI opened on 2026-04-01')
+    expect(screen.getByLabelText('Date')).toHaveValue('2026-03-31')
+  })
+
+  it('removes a movement only after the removal is confirmed', async () => {
+    vi.mocked(fetchTransactions).mockResolvedValueOnce([EXPENSE]).mockResolvedValueOnce([])
+    vi.mocked(deleteTransaction).mockResolvedValue(undefined)
+    renderPage()
+    await screen.findByText('Blinkit')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(deleteTransaction).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    await waitFor(() => expect(deleteTransaction).toHaveBeenCalledWith(3))
+    expect(await screen.findByText(/Nothing recorded yet/)).toBeInTheDocument()
+  })
+
+  it('reports a removal that was refused, and keeps the movement', async () => {
+    vi.mocked(fetchTransactions).mockResolvedValue([EXPENSE])
+    vi.mocked(deleteTransaction).mockRejectedValue(new Error('Transaction 3 does not exist'))
+    renderPage()
+    await screen.findByText('Blinkit')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Transaction 3 does not exist')
+    expect(screen.getByText('Blinkit')).toBeInTheDocument()
   })
 })
