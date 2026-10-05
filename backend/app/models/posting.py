@@ -31,6 +31,11 @@ class Posting(TimestampMixin, Base):
     )
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False, index=True)
     amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # Which name this money is filed under. Nullable, because an import or a
+    # transfer has nothing to file yet; a category can be added later.
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("categories.id"), nullable=True, index=True
+    )
     kind: Mapped[PostingKind] = mapped_column(
         SqlEnum(
             PostingKind,

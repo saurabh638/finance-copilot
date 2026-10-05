@@ -71,7 +71,7 @@ def _empty_tables() -> None:
         connection.execute(
             text(
                 "TRUNCATE TABLE sessions, users, login_failures, accounts, "
-                "interest_rates, transactions, postings, balance_checks "
+                "interest_rates, transactions, postings, balance_checks, categories "
                 "RESTART IDENTITY CASCADE"
             )
         )

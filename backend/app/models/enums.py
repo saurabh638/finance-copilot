@@ -34,6 +34,18 @@ class RateFrequency(StrEnum):
     YEARLY = "yearly"
 
 
+class CategoryKind(StrEnum):
+    """What a category is for, which its children inherit from it.
+
+    `adjustment` is the kind the two write-off names carry, so a balance check's
+    difference has a home without pretending to be spending or income.
+    """
+
+    EXPENSE = "expense"
+    INCOME = "income"
+    ADJUSTMENT = "adjustment"
+
+
 class PostingKind(StrEnum):
     """What one account's side of a transaction is.
 

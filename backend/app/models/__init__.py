@@ -3,9 +3,11 @@
 from app.models.account import Account
 from app.models.balance_check import BalanceCheck
 from app.models.base import Base
+from app.models.category import Category
 from app.models.enums import (
     AccountType,
     CaptureMode,
+    CategoryKind,
     PostingKind,
     RateFrequency,
     TransactionSource,
@@ -23,6 +25,8 @@ __all__ = [
     "BalanceCheck",
     "Base",
     "CaptureMode",
+    "Category",
+    "CategoryKind",
     "InterestRate",
     "LoginFailure",
     "Posting",
