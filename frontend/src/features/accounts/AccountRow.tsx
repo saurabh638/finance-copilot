@@ -10,16 +10,20 @@ interface AccountRowProps {
   parentName?: string | undefined
   isEditing: boolean
   onEdit: () => void
-  /** The editor, rendered under the summary while it is open. */
+  isChecking: boolean
+  onCheck: () => void
+  /** The editor or the balance check, rendered under the summary while open. */
   children?: ReactNode
 }
 
-/** One account as the user reads it: what it is, how it arrives, from when. */
+/** One account as the user reads it: what it is, what it holds, what it is. */
 export default function AccountRow({
   account,
   parentName,
   isEditing,
   onEdit,
+  isChecking,
+  onCheck,
   children,
 }: AccountRowProps) {
   return (
@@ -41,13 +45,22 @@ export default function AccountRow({
       )}
       {!account.is_active && <p className="mt-1 text-sm text-slate-600">Not active</p>}
 
-      <button
-        type="button"
-        onClick={onEdit}
-        className="mt-3 min-h-11 rounded border border-slate-300 bg-white px-4 text-slate-900"
-      >
-        {isEditing ? 'Close' : 'Edit'}
-      </button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="min-h-11 rounded border border-slate-300 bg-white px-4 text-slate-900"
+        >
+          {isEditing ? 'Close' : 'Edit'}
+        </button>
+        <button
+          type="button"
+          onClick={onCheck}
+          className="min-h-11 rounded border border-slate-300 bg-white px-4 text-slate-900"
+        >
+          {isChecking ? 'Cancel check' : 'Check balance'}
+        </button>
+      </div>
 
       {children}
     </li>

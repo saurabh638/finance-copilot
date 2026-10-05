@@ -24,13 +24,21 @@ const SAVINGS: Account = {
   updated_at: '2026-04-01T00:00:00Z',
 }
 
-function renderRow(account: Account, parentName?: string, isEditing = false) {
+function renderRow(account: Account, parentName?: string, isEditing = false, isChecking = false) {
   const onEdit = vi.fn()
+  const onCheck = vi.fn()
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <ul>
-        <AccountRow account={account} parentName={parentName} isEditing={isEditing} onEdit={onEdit}>
+        <AccountRow
+          account={account}
+          parentName={parentName}
+          isEditing={isEditing}
+          onEdit={onEdit}
+          isChecking={isChecking}
+          onCheck={onCheck}
+        >
           {isEditing && <p>editor</p>}
         </AccountRow>
       </ul>
@@ -61,6 +69,19 @@ describe('AccountRow', () => {
     expect(await screen.findByText('₹1,23,456.78')).toBeInTheDocument()
     expect(screen.getByText(/Opening .* \+ movements/)).toBeInTheDocument()
     expect(screen.getByText(/Savings · Statement import · from 2026-04-01/)).toBeInTheDocument()
+  })
+
+  it('offers the two things a row can do, and says which is open', () => {
+    renderRow(SAVINGS, undefined, true, true)
+
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel check' })).toBeInTheDocument()
+  })
+
+  it('offers a balance check when one is not open', () => {
+    renderRow(SAVINGS)
+
+    expect(screen.getByRole('button', { name: 'Check balance' })).toBeInTheDocument()
   })
 
   it('names the parent of a pot', () => {

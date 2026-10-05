@@ -6,8 +6,10 @@ import { fetchSession } from '../../lib/api'
 import AccountsPage from './AccountsPage'
 import {
   createAccount,
+  createBalanceCheck,
   createRate,
   fetchAccounts,
+  fetchAdjustmentShare,
   fetchBalance,
   fetchRates,
   updateAccount,
@@ -88,6 +90,43 @@ describe('AccountsPage', () => {
     renderPage()
 
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument()
+  })
+
+  it('checks an account against the bank, and can put the check away', async () => {
+    vi.mocked(fetchAdjustmentShare).mockResolvedValue({
+      month: '2026-10-01',
+      spend_paise: 2_50_000,
+      adjustments_paise: 50_000,
+      share_percent: 20,
+    })
+    vi.mocked(createBalanceCheck).mockResolvedValue({
+      id: 5,
+      account_id: 1,
+      checked_on: '2026-10-05',
+      computed_balance_paise: 12_295_678,
+      stated_balance_paise: 12_245_678,
+      difference_paise: -50_000,
+      adjustment_transaction_id: null,
+      warning: false,
+      threshold_paise: 1_00_000,
+    })
+    renderPage()
+    await screen.findByText('SBI')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check balance' }))
+    fireEvent.change(screen.getByLabelText('Balance your bank shows'), {
+      target: { value: '1,22,456.78' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Compare' }))
+
+    expect(await screen.findByText('₹500.00 less than the ledger says.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Written off this month: ₹500.00 of ₹2,500.00 spent (20%).'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel check' }))
+
+    expect(screen.queryByLabelText('Balance your bank shows')).not.toBeInTheDocument()
   })
 
   it('shows a clear error when the list cannot be loaded', async () => {

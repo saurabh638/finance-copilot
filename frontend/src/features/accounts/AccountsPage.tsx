@@ -1,21 +1,29 @@
 import { useState } from 'react'
 
 import PageHeader from '../../components/PageHeader'
+import { todayIso } from '../../lib/dates'
 import AccountEditor from './AccountEditor'
 import AccountForm from './AccountForm'
 import AccountRow from './AccountRow'
+import BalanceCheckPanel from './BalanceCheckPanel'
 import { type NewAccount, useAccounts, useCreateAccount } from './useAccounts'
 
+interface AccountsPageProps {
+  /** Today, so that a test can hold the clock still. */
+  today?: string
+}
+
 /**
- * The signed-in screen: the user's accounts, and the form that adds one.
+ * The signed-in screen: the user's accounts, what each holds, and the form that adds one.
  *
  * Money comes from the API as integer paise and is only ever formatted here.
  */
-export default function AccountsPage() {
+export default function AccountsPage({ today = todayIso() }: AccountsPageProps = {}) {
   const accounts = useAccounts()
   const createAccount = useCreateAccount()
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [checkingId, setCheckingId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const list = accounts.data ?? []
@@ -69,6 +77,8 @@ export default function AccountsPage() {
               parentName={account.parent_id === null ? undefined : byId.get(account.parent_id)}
               isEditing={editingId === account.id}
               onEdit={() => setEditingId(editingId === account.id ? null : account.id)}
+              isChecking={checkingId === account.id}
+              onCheck={() => setCheckingId(checkingId === account.id ? null : account.id)}
             >
               {editingId === account.id && (
                 <AccountEditor
@@ -79,6 +89,9 @@ export default function AccountsPage() {
                     setNotice(message ?? null)
                   }}
                 />
+              )}
+              {checkingId === account.id && (
+                <BalanceCheckPanel accountId={account.id} today={today} />
               )}
             </AccountRow>
           ))}
