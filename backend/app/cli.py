@@ -6,6 +6,7 @@ Run inside the container, for example:
     docker compose exec backend python -m app.cli seed
     docker compose exec backend python -m app.cli seed --demo
     docker compose exec backend python -m app.cli seed --remove-demo
+    docker compose exec backend python -m app.cli seed-categories
 
 Credentials are read from the environment (ADMIN_EMAIL, ADMIN_PASSWORD) so a
 password never lands in shell history or the process list.
@@ -19,6 +20,7 @@ from app.config import get_settings
 from app.core.money import InvalidMoneyError
 from app.db import SessionLocal
 from app.services.auth import EmailAlreadyUsedError, create_user, find_user
+from app.services.categories import seed_defaults
 from app.services.seeding import (
     SEED_ACCOUNTS,
     SeedEntry,
@@ -47,6 +49,31 @@ def _create_user() -> int:
             print(f"A user with email {email} already exists.", file=sys.stderr)
             return 1
         print(f"Created user {user.email} (id {user.id}).")
+
+    return 0
+
+
+def _seed_categories() -> int:
+    """Give the one user the default category tree, once."""
+    settings = get_settings()
+    email = settings.admin_email
+    if not email:
+        print("Set ADMIN_EMAIL in the environment first.", file=sys.stderr)
+        return 1
+
+    with SessionLocal() as db:
+        user = find_user(db, email)
+        if user is None:
+            print(f"No user with email {email}. Run create-user first.", file=sys.stderr)
+            return 1
+
+        created = seed_defaults(db, user.id)
+        if not created:
+            print("Categories already exist, so nothing was added.")
+            return 0
+
+        branches = len([row for row in created if row.parent_id is None])
+        print(f"Created {len(created)} categories in {branches} top-level groups.")
 
     return 0
 
@@ -126,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="app.cli", description="Finance Co-pilot tasks.")
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("create-user", help="Create the single user.")
+    subcommands.add_parser("seed-categories", help="Create the default category tree, once.")
 
     seed = subcommands.add_parser("seed", help="Create the six real accounts.")
     seed.add_argument(
@@ -144,6 +172,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "create-user":
         return _create_user()
+
+    if args.command == "seed-categories":
+        return _seed_categories()
 
     try:
         return _seed(demo=args.demo, remove_placeholders=args.remove_placeholders)
