@@ -4,7 +4,9 @@ Thin layer: parse the request, call one service function, translate a service
 error into an HTTP status. No tree rules live here.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -13,6 +15,7 @@ from app.models import User
 from app.schemas.category import (
     CategoryCreate,
     CategoryResponse,
+    CategorySpendResponse,
     CategoryUpdate,
     DefaultsResponse,
 )
@@ -131,6 +134,23 @@ def remove(
         raise _in_use(error) from error
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/spend", response_model=list[CategorySpendResponse])
+def spend(
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[CategorySpendResponse]:
+    """What was spent under each expense category in a period, children rolled in.
+
+    `from` and `to` are inclusive dates on the transaction, and either may be
+    left out. A category with nothing spent is a row of zeros rather than a
+    missing row, so the tree the client draws is the whole tree.
+    """
+    rows = categories.spend_by_category(db, user.id, from_date=from_date, to_date=to_date)
+    return [CategorySpendResponse.model_validate(row) for row in rows]
 
 
 @router.post("/defaults", response_model=DefaultsResponse)

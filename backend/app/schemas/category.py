@@ -45,3 +45,21 @@ class DefaultsResponse(BaseModel):
     """What the default set added, which is nothing when the tree was not empty."""
 
     created: list[CategoryResponse]
+
+
+class CategorySpendResponse(BaseModel):
+    """One row of the spend report.
+
+    `direct_paise` is what was filed under this category itself; `total_paise`
+    adds everything filed under its children, so a group answers for its whole
+    branch. Categories with nothing spent are rows too, with zeros.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    parent_id: int | None
+    kind: CategoryKind
+    direct_paise: int
+    total_paise: int
