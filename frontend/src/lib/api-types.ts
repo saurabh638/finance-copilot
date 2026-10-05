@@ -136,6 +136,26 @@ export interface paths {
     patch: operations['patch_api_v1_accounts__account_id__patch']
     trace?: never
   }
+  '/api/v1/accounts/{account_id}/balance': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Read Balance
+     * @description The account's balance, and the two figures it was worked out from.
+     */
+    get: operations['read_balance_api_v1_accounts__account_id__balance_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/accounts/{account_id}/interest-rates': {
     parameters: {
       query?: never
@@ -178,6 +198,60 @@ export interface paths {
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/api/v1/transactions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Index
+     * @description The user's transactions, newest first, filtered and paginated.
+     *
+     *     `from` and `to` are inclusive dates on the transaction. The filters combine.
+     */
+    get: operations['index_api_v1_transactions_get']
+    put?: never
+    /**
+     * Create
+     * @description Record an expense, an income or a transfer.
+     */
+    post: operations['create_api_v1_transactions_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/transactions/{transaction_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Show
+     * @description One transaction, with its postings.
+     */
+    get: operations['show_api_v1_transactions__transaction_id__get']
+    put?: never
+    post?: never
+    /**
+     * Destroy
+     * @description Soft-delete a transaction and its postings. The rows are kept.
+     */
+    delete: operations['destroy_api_v1_transactions__transaction_id__delete']
+    options?: never
+    head?: never
+    /**
+     * Patch
+     * @description Change the date, merchant, note, or the amount of a single posting.
+     */
+    patch: operations['patch_api_v1_transactions__transaction_id__patch']
     trace?: never
   }
 }
@@ -284,11 +358,54 @@ export interface components {
       is_active?: boolean | null
     }
     /**
+     * BalanceResponse
+     * @description An account's balance, and the two figures it was worked out from.
+     *
+     *     The parts are reported as well as the answer, so a figure can always be
+     *     explained rather than merely trusted. Money is integer paise throughout.
+     */
+    BalanceResponse: {
+      /** Account Id */
+      account_id: number
+      /** As Of */
+      as_of: string | null
+      /** Opening Balance Paise */
+      opening_balance_paise: number
+      /** Postings Paise */
+      postings_paise: number
+      /** Balance Paise */
+      balance_paise: number
+    }
+    /**
      * CaptureMode
      * @description How the transactions for an account are expected to arrive.
      * @enum {string}
      */
     CaptureMode: 'statement_import' | 'manual_only' | 'hybrid'
+    /**
+     * ExpenseCreate
+     * @description Money leaving one account. The amount is positive; the kind sets the sign.
+     */
+    ExpenseCreate: {
+      /**
+       * Transaction Date
+       * Format: date
+       */
+      transaction_date: string
+      /** Merchant */
+      merchant?: string | null
+      /** Note */
+      note?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'expense'
+      /** Account Id */
+      account_id: number
+      /** Amount Paise */
+      amount_paise: number
+    }
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -303,6 +420,30 @@ export interface components {
       status: string
       /** Database */
       database: string
+    }
+    /**
+     * IncomeCreate
+     * @description Money arriving in one account.
+     */
+    IncomeCreate: {
+      /**
+       * Transaction Date
+       * Format: date
+       */
+      transaction_date: string
+      /** Merchant */
+      merchant?: string | null
+      /** Note */
+      note?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'income'
+      /** Account Id */
+      account_id: number
+      /** Amount Paise */
+      amount_paise: number
     }
     /**
      * InterestRateCreate
@@ -365,11 +506,104 @@ export interface components {
       password: string
     }
     /**
+     * PostingKind
+     * @description What one account's side of a transaction is.
+     *
+     *     Only expense and income count as spending or earning; a transfer, a card
+     *     payment, a refund and an adjustment must never be counted as either.
+     * @enum {string}
+     */
+    PostingKind:
+      'expense' | 'income' | 'transfer' | 'adjustment' | 'interest' | 'fee' | 'investment'
+    /**
+     * PostingResponse
+     * @description One account's side of a transaction, as returned by the API.
+     */
+    PostingResponse: {
+      /** Id */
+      id: number
+      /** Account Id */
+      account_id: number
+      /** Amount Paise */
+      amount_paise: number
+      kind: components['schemas']['PostingKind']
+    }
+    /**
      * RateFrequency
      * @description How often interest at a given rate is credited.
      * @enum {string}
      */
     RateFrequency: 'daily' | 'monthly' | 'quarterly' | 'yearly'
+    /**
+     * TransactionResponse
+     * @description A transaction and the postings that carry its amounts.
+     */
+    TransactionResponse: {
+      /** Id */
+      id: number
+      /**
+       * Transaction Date
+       * Format: date
+       */
+      transaction_date: string
+      /** Merchant */
+      merchant: string | null
+      /** Note */
+      note: string | null
+      source: components['schemas']['TransactionSource']
+      /** Postings */
+      postings: components['schemas']['PostingResponse'][]
+    }
+    /**
+     * TransactionSource
+     * @description How a transaction arrived, so an imported batch can be reversed whole.
+     * @enum {string}
+     */
+    TransactionSource: 'manual' | 'import' | 'recurring' | 'ai_approved'
+    /**
+     * TransactionUpdate
+     * @description What may change. The accounts and the kind never do.
+     *
+     *     An omitted field is left alone; an explicit null clears it. The amount may
+     *     only be changed when the transaction has a single posting, because a transfer
+     *     is two postings that must keep summing to zero.
+     */
+    TransactionUpdate: {
+      /** Transaction Date */
+      transaction_date?: string | null
+      /** Merchant */
+      merchant?: string | null
+      /** Note */
+      note?: string | null
+      /** Amount Paise */
+      amount_paise?: number | null
+    }
+    /**
+     * TransferCreate
+     * @description Money moving between two accounts, as two postings that sum to zero.
+     */
+    TransferCreate: {
+      /**
+       * Transaction Date
+       * Format: date
+       */
+      transaction_date: string
+      /** Merchant */
+      merchant?: string | null
+      /** Note */
+      note?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'transfer'
+      /** From Account Id */
+      from_account_id: number
+      /** To Account Id */
+      to_account_id: number
+      /** Amount Paise */
+      amount_paise: number
+    }
     /**
      * UserResponse
      * @description The signed-in user. Never includes the password hash.
@@ -653,6 +887,46 @@ export interface operations {
       }
     }
   }
+  read_balance_api_v1_accounts__account_id__balance_get: {
+    parameters: {
+      query?: {
+        as_of?: string | null
+      }
+      header?: never
+      path: {
+        account_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BalanceResponse']
+        }
+      }
+      /** @description The account does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   list_interest_rates_api_v1_accounts__account_id__interest_rates_get: {
     parameters: {
       query?: {
@@ -763,6 +1037,215 @@ export interface operations {
         content?: never
       }
       /** @description The account or the rate does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  index_api_v1_transactions_get: {
+    parameters: {
+      query?: {
+        account_id?: number | null
+        from?: string | null
+        to?: string | null
+        kind?: components['schemas']['PostingKind'] | null
+        limit?: number
+        offset?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionResponse'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_api_v1_transactions_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json':
+          | components['schemas']['ExpenseCreate']
+          | components['schemas']['IncomeCreate']
+          | components['schemas']['TransferCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionResponse']
+        }
+      }
+      /** @description A rule the database holds was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description An account does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  show_api_v1_transactions__transaction_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        transaction_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionResponse']
+        }
+      }
+      /** @description The transaction does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  destroy_api_v1_transactions__transaction_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        transaction_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The transaction does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  patch_api_v1_transactions__transaction_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        transaction_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionResponse']
+        }
+      }
+      /** @description A rule the database holds was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The transaction does not exist */
       404: {
         headers: {
           [name: string]: unknown

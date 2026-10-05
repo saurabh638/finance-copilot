@@ -1,0 +1,108 @@
+/** Turning a transaction from the API into the words one row shows. */
+
+import { formatPaise } from '../../lib/money'
+import type { PostingKind, Transaction } from './api'
+
+/**
+ * Labels for every posting kind the server can send.
+ *
+ * `satisfies Record<PostingKind, string>` makes a new kind on the server a
+ * compile error here, rather than a row with no wording.
+ */
+export const POSTING_KIND_LABELS = {
+  expense: 'Money out',
+  income: 'Money in',
+  transfer: 'Transfer',
+  adjustment: 'Balance adjustment',
+  interest: 'Interest',
+  fee: 'Fee',
+  investment: 'Investment',
+} satisfies Record<PostingKind, string>
+
+const UNKNOWN_ACCOUNT = 'Another account'
+const NO_DESCRIPTION = 'No description'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** An account's name, or a neutral stand-in when it is not in the list. */
+function nameOf(accountId: number, names: Map<number, string>): string {
+  return names.get(accountId) ?? UNKNOWN_ACCOUNT
+}
+
+/** The paise this movement moved, always positive. */
+export function movementAmountPaise(transaction: Transaction): number {
+  const [only] = transaction.postings
+  if (transaction.postings.length === 1 && only !== undefined) {
+    return Math.abs(only.amount_paise)
+  }
+
+  // Two postings: the amount that arrived on the other side is the amount moved.
+  return transaction.postings.reduce(
+    (total, posting) => total + Math.max(0, posting.amount_paise),
+    0,
+  )
+}
+
+/** What the movement did, in words. */
+export function movementLabel(transaction: Transaction): string {
+  const [only] = transaction.postings
+  if (transaction.postings.length === 1 && only !== undefined) {
+    return POSTING_KIND_LABELS[only.kind]
+  }
+
+  return POSTING_KIND_LABELS.transfer
+}
+
+/** The accounts involved: one for an expense, both sides for a transfer. */
+export function movementParties(transaction: Transaction, names: Map<number, string>): string {
+  const [only] = transaction.postings
+  if (transaction.postings.length === 1 && only !== undefined) {
+    return nameOf(only.account_id, names)
+  }
+
+  const out = transaction.postings
+    .filter((posting) => posting.amount_paise < 0)
+    .map((posting) => nameOf(posting.account_id, names))
+  const arrived = transaction.postings
+    .filter((posting) => posting.amount_paise > 0)
+    .map((posting) => nameOf(posting.account_id, names))
+
+  return [...out, ...arrived].join(' → ')
+}
+
+/**
+ * The amount as text.
+ *
+ * A single posting keeps its sign, so spending can never be mistaken for income.
+ * A transfer is neither, so it shows the amount moved and no sign at all.
+ */
+export function movementAmountText(transaction: Transaction): string {
+  const [only] = transaction.postings
+  if (transaction.postings.length === 1 && only !== undefined) {
+    return formatPaise(only.amount_paise)
+  }
+
+  return formatPaise(movementAmountPaise(transaction))
+}
+
+/** Merchant, else the note, else a neutral line so a row is never blank. */
+export function movementTitle(transaction: Transaction): string {
+  const merchant = transaction.merchant?.trim() ?? ''
+  if (merchant !== '') {
+    return merchant
+  }
+
+  const note = transaction.note?.trim() ?? ''
+  return note === '' ? NO_DESCRIPTION : note
+}
+
+/** `2026-10-04` as `4 Oct 2026`. Anything unreadable is handed back as it came. */
+export function displayDate(iso: string): string {
+  const [year, month, day] = iso.split('-')
+  const monthName = MONTHS[Number(month) - 1]
+  if (monthName === undefined || day === undefined || year === undefined) {
+    return iso
+  }
+
+  return `${String(Number(day))} ${monthName} ${year}`
+}
