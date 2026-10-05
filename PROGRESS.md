@@ -22,7 +22,9 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M8c Edit, delete and balances in the UI | done | A movement opens pre-filled for correction, removal asks first and is soft, and each account shows the balance it was worked out from. M8 is complete. Approved. |
 | M9a Balance check backend | done | `BalanceCheck` model, migration 0007, pure reconciliation maths, the service that posts the write-off as a visible `adjustment` posting, and three endpoints. Approved. |
 | M9b The ten-second screen | done | *Check balance* on an account: enter the real balance, see the ledger's figure, the bank's and the difference, then write it off or put it away, with the nudge and the month's share. M9 is complete. Approved. |
-| M10 Categories | not started | |
+| M10a The category tree | done | `Category` model, migration 0008 (the table and `postings.category_id`), the seeded Indian-household set, tree CRUD with its rules, and `seed-categories`. Approved. |
+| M10b Categories in use | not started | A movement carries a category; a write-off takes `Unaccounted for spending` or `Unrecorded income` by its sign; splits; spend by category. |
+| M10c The category screens | not started | The picker on the entry forms, the categories page, and the spend-by-category view. |
 | M11 Daily check-in screen | not started | |
 | M12 Recurring and scheduled items | not started | |
 | M13 Interest accrual engine | not started | |
@@ -37,9 +39,10 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M9 is complete**: an account can be checked against the bank from the screen, the check is kept, the
-difference is written off as a visible posting, and the month's share sits beside the nudge. **M10 is
-next** — categories — and the two-week Phase 0 gate can begin once it is done.
+**M10a is done**: the tree exists, seeded with a recognisable Indian-household set, and each account's
+movements can be filed under it once M10b lands. **M10b is next** — the write-off names attached first,
+then splits, which are the one change that touches the money rule — followed by M10c, the screens. The
+two-week Phase 0 gate can begin after M10c.
 
 Before the app holds real data:
 
@@ -51,6 +54,9 @@ Before the app holds real data:
   unaccounted spending). SBI's balance is ₹1,45,000 because a walkthrough wrote it down to a stated
   figure. These are dummy entries with no real balances, kept for now so there is something to look at.
   `seed --demo` restores the six placeholders; `docker compose down -v` clears everything.
+- The development database has a category tree: the seeded 51 names over 18 top-level groups, created by
+  `seed-categories`, plus one extra top-level name (*Filter coffee*) left by the M10a walkthrough. The two
+  write-off names are in the tree. `docker compose down -v` clears this with the rest.
 - Take a backup before any risky change: `./scripts/backup.sh`.
 
 ## Open questions
@@ -76,5 +82,6 @@ Before the app holds real data:
   adjustment a check points at, or mark it as belonging to a check. Not built in M9b.
 - The share is per account. The Phase 0 gate's "write-offs under 5% of spending" wants one figure across
   every account, which needs its own endpoint.
-- A write-off has no category until M10: `category_id` is NULL and the wording
-  (`Unaccounted for spending` / `Unrecorded income`) sits in the note. M10 attaches the real categories.
+- A write-off has no category until M10b: `category_id` is NULL and the wording
+  (`Unaccounted for spending` / `Unrecorded income`) sits in the note. The two names now exist in the
+  tree with kind `adjustment`; M10b attaches them by the sign of the difference.
