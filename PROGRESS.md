@@ -20,7 +20,8 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M8a Transactions API | done | Recording, reading back, editing and soft-deleting a movement: `POST`/`GET /api/v1/transactions` and `GET`/`PATCH`/`DELETE /api/v1/transactions/{id}`. The create body is a discriminated union on `kind`. Approved. |
 | M8b Transactions screen | done | Transactions tab: the list newest first, account and date filters, and one form that records an expense, an income or a transfer. Balances still live on the API only. Approved. |
 | M8c Edit, delete and balances in the UI | done | A movement opens pre-filled for correction, removal asks first and is soft, and each account shows the balance it was worked out from. M8 is complete. Approved. |
-| M9 Balance check and write-off | not started | |
+| M9a Balance check backend | done | `BalanceCheck` model, migration 0007, pure reconciliation maths, the service that posts the write-off as a visible `adjustment` posting, and three endpoints. Approved. |
+| M9b The ten-second screen | not started | Enter the real balance, see computed versus stated, write the difference off or cancel, with the nudge and the adjustments-versus-spending figure. |
 | M10 Categories | not started | |
 | M11 Daily check-in screen | not started | |
 | M12 Recurring and scheduled items | not started | |
@@ -36,9 +37,9 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M8 is complete**: a movement can be recorded, listed, filtered, corrected and removed by hand, and
-each account shows the balance those movements produced. **M9 is next** — the balance check and
-write-off — after which the two-week Phase 0 gate can begin.
+**M8 is complete** and M9a is on `main`: the engine can compare the ledger with the bank, keep the check,
+and write the difference off as a visible posting. **M9b is next** — the ten-second screen that does it
+in the browser — after which the two-week Phase 0 gate can begin.
 
 Before the app holds real data:
 
@@ -46,8 +47,9 @@ Before the app holds real data:
   balance that was true on a start date, and that date. Nothing else blocks it.
 - The development database was rebuilt from empty in M7 and holds two accounts (SBI, Central Bank) and
   nine movements recorded through the API and the screen during the M7, M8a, M8b and M8c walkthroughs,
-  seven of them live and two removed from the screen. They are dummy entries with no real balances, kept
-  for now so there is something to look at. `seed --demo` restores the six placeholders;
+  seven of them live and two removed from the screen. M9a's walkthrough added three balance checks and
+  one write-off of ₹500 of unaccounted spending. They are dummy entries with no real balances, kept for
+  now so there is something to look at. `seed --demo` restores the six placeholders;
   `docker compose down -v` clears everything.
 - Take a backup before any risky change: `./scripts/backup.sh`.
 
@@ -65,3 +67,9 @@ Before the app holds real data:
   balance check or as its own small change.
 - The Accounts screen asks for one balance per account. That is a handful of cached calls today; past
   roughly twenty accounts it should become a single `GET /accounts/balances`.
+- The write-off nudge is a flat `BALANCE_CHECK_WARNING_PAISE` (₹1,000). SPEC.md measures the same thing
+  as a share of spending (under 5% is healthy, 25% means something is systematically missing). Proposed
+  for M9b: show the share beside the warning; decide later whether the threshold itself becomes a
+  percentage of the month.
+- A write-off has no category until M10: `category_id` is NULL and the wording
+  (`Unaccounted for spending` / `Unrecorded income`) sits in the note. M10 attaches the real categories.
