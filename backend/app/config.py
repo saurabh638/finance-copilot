@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,9 @@ class Settings(BaseSettings):
     session_ttl_days: int = 30
     login_max_attempts: int = 5
     login_window_minutes: int = 15
+    # A write-off larger than this is worth a second look first. It is never
+    # refused, only questioned, so this is a nudge rather than a limit.
+    balance_check_warning_paise: int = Field(default=1_00_000, ge=0)
     admin_email: str | None = None
     admin_password: str | None = None
 

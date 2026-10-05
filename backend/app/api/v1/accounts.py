@@ -10,12 +10,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.config import get_settings
 from app.db import get_session
 from app.models import User
 from app.schemas.account import AccountCreate, AccountResponse, AccountUpdate
+from app.schemas.balance_check import (
+    AdjustmentShareResponse,
+    BalanceCheckCreate,
+    BalanceCheckResponse,
+    BalanceCheckSummaryResponse,
+)
 from app.schemas.interest_rate import InterestRateCreate, InterestRateResponse
 from app.schemas.transaction import BalanceResponse
-from app.services import interest_rates, transactions
+from app.services import balance_checks, interest_rates, transactions
 from app.services.accounts import (
     AccountNotFoundError,
     InvalidAccountError,
@@ -26,6 +33,7 @@ from app.services.accounts import (
     update_account,
 )
 from app.services.interest_rates import DuplicateRateError, RateNotFoundError
+from app.services.transactions import InvalidTransactionError
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -219,3 +227,95 @@ def delete_rate(
     except RateNotFoundError as error:
         raise _rate_not_found(rate_id) from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _too_early(error: InvalidTransactionError) -> HTTPException:
+    """The one 400 a date rule produces, worded by the service."""
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post(
+    "/{account_id}/balance-checks",
+    response_model=BalanceCheckResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"description": "The check date is before the account opened"},
+        status.HTTP_404_NOT_FOUND: {"description": "The account does not exist"},
+    },
+)
+def create_balance_check(
+    account_id: int,
+    payload: BalanceCheckCreate,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BalanceCheckResponse:
+    """Compare the ledger with the bank, and write the difference off if asked.
+
+    The threshold is advice, not a rule: a large difference is flagged and the
+    write-off still happens when the user has decided on it.
+    """
+    try:
+        outcome = balance_checks.check_balance(
+            db,
+            user.id,
+            account_id,
+            on=payload.on,
+            stated_paise=payload.stated_balance_paise,
+            adjust=payload.adjust,
+            warning_threshold_paise=get_settings().balance_check_warning_paise,
+        )
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+    except InvalidTransactionError as error:
+        raise _too_early(error) from error
+
+    summary = BalanceCheckSummaryResponse.model_validate(outcome.record)
+    return BalanceCheckResponse(
+        **summary.model_dump(),
+        warning=outcome.warning,
+        threshold_paise=outcome.threshold_paise,
+    )
+
+
+@router.get(
+    "/{account_id}/balance-checks",
+    response_model=list[BalanceCheckSummaryResponse],
+    responses={status.HTTP_404_NOT_FOUND: {"description": "The account does not exist"}},
+)
+def index_balance_checks(
+    account_id: int,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[BalanceCheckSummaryResponse]:
+    """The account's balance checks, most recent first."""
+    try:
+        found = balance_checks.list_checks(db, user.id, account_id)
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+
+    return [BalanceCheckSummaryResponse.model_validate(record) for record in found]
+
+
+@router.get(
+    "/{account_id}/adjustment-share",
+    response_model=AdjustmentShareResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "The account does not exist"}},
+)
+def read_adjustment_share(
+    account_id: int,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+    month: date | None = None,
+) -> AdjustmentShareResponse:
+    """Write-offs as a share of the month's spending, for the month given."""
+    try:
+        share = balance_checks.adjustment_share(db, user.id, account_id, month or date.today())
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+
+    return AdjustmentShareResponse(
+        month=share.month,
+        spend_paise=share.spend_paise,
+        adjustments_paise=share.adjustments_paise,
+        share_percent=share.share_percent,
+    )
