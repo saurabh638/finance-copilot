@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 import { fetchAccounts } from './features/accounts/api'
+import { fetchTransactions } from './features/transactions/api'
 import { fetchSession, login, logout } from './lib/api'
 
 vi.mock('./lib/api')
 vi.mock('./features/accounts/api')
+vi.mock('./features/transactions/api')
 
 const USER = { id: 1, email: 'owner@example.com' }
 
@@ -29,6 +31,7 @@ async function fillAndSubmit(email: string, password: string) {
 describe('App', () => {
   beforeEach(() => {
     vi.mocked(fetchAccounts).mockResolvedValue([])
+    vi.mocked(fetchTransactions).mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -43,13 +46,27 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'Log in' })).toBeInTheDocument()
   })
 
-  it('shows the accounts screen when a session already exists', async () => {
+  it('opens on the transactions screen when a session already exists', async () => {
     vi.mocked(fetchSession).mockResolvedValue(USER)
 
     renderApp()
 
     expect(await screen.findByText(`Signed in as ${USER.email}`)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
+  })
+
+  it('moves between the two screens from the tabs', async () => {
+    vi.mocked(fetchSession).mockResolvedValue(USER)
+
+    renderApp()
+    fireEvent.click(await screen.findByRole('button', { name: 'Accounts' }))
+
     expect(await screen.findByRole('heading', { name: 'Accounts' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Transactions' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transactions' }))
+
+    expect(await screen.findByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
   })
 
   it('signs in and reveals the accounts screen', async () => {
