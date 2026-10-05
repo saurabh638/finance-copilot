@@ -18,7 +18,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M6 Backup and restore | done | Dated dumps in `backups/`, restore into a scratch database, a row-count round trip, and the last-resort promotion documented and tested. Approved. |
 | M7 Postings and ledger core | done | `Transaction` and `Posting` models, migration 0006, pure `core/ledger.py`, expense/income/transfer services, and the balance endpoint. Approved. |
 | M8a Transactions API | done | Recording, reading back, editing and soft-deleting a movement: `POST`/`GET /api/v1/transactions` and `GET`/`PATCH`/`DELETE /api/v1/transactions/{id}`. The create body is a discriminated union on `kind`. Approved. |
-| M8b Transactions screen | not started | The list, its filters and the add form, on a two-item app shell. |
+| M8b Transactions screen | done | Transactions tab: the list newest first, account and date filters, and one form that records an expense, an income or a transfer. Balances still live on the API only. Approved. |
 | M8c Edit, delete and balances in the UI | not started | Editing and deleting from the screen, with each account's balance shown. |
 | M9 Balance check and write-off | not started | |
 | M10 Categories | not started | |
@@ -36,19 +36,18 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-M7 and M8a are built and on `main`: a movement can be recorded, listed, corrected and deleted through the
-API, and a balance can be watched moving. **M8b is next** — the Transactions screen — followed by M8c,
-which brings editing, deleting and balances into that screen. M8 as a whole is the point from which the
-two-week Phase 0 gate can realistically begin.
+The app now opens on the Transactions tab: a movement can be recorded, listed and filtered by hand, and
+M8a's API backs it. **M8c is next** — editing, soft-deleting and balances in that screen — after which M8
+is complete and the two-week Phase 0 gate can begin.
 
 Before the app holds real data:
 
 - Running `seed` for real needs the 12 values only the user can give: for each of the six accounts, the
   balance that was true on a start date, and that date. Nothing else blocks it.
 - The development database was rebuilt from empty in M7 and holds two accounts (SBI, Central Bank) and
-  six transactions recorded through the API during the M7 and M8a walkthroughs, one of them
-  soft-deleted. They are dummy entries with no real balances, kept for now so M8b has something to
-  show. `seed --demo` restores the six placeholders; `docker compose down -v` clears everything.
+  nine transactions recorded through the API and the screen during the M7, M8a and M8b walkthroughs, one
+  of them soft-deleted. They are dummy entries with no real balances, kept for now so there is something
+  to look at. `seed --demo` restores the six placeholders; `docker compose down -v` clears everything.
 - Take a backup before any risky change: `./scripts/backup.sh`.
 
 ## Open questions
