@@ -1,9 +1,12 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { formatPaise } from '../../lib/money'
 import type { Account } from './api'
 import AccountRow from './AccountRow'
+import { fetchBalance } from './api'
+
+vi.mock('./api')
 
 const SAVINGS: Account = {
   id: 1,
@@ -23,22 +26,40 @@ const SAVINGS: Account = {
 
 function renderRow(account: Account, parentName?: string, isEditing = false) {
   const onEdit = vi.fn()
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <ul>
-      <AccountRow account={account} parentName={parentName} isEditing={isEditing} onEdit={onEdit}>
-        {isEditing && <p>editor</p>}
-      </AccountRow>
-    </ul>,
+    <QueryClientProvider client={queryClient}>
+      <ul>
+        <AccountRow account={account} parentName={parentName} isEditing={isEditing} onEdit={onEdit}>
+          {isEditing && <p>editor</p>}
+        </AccountRow>
+      </ul>
+    </QueryClientProvider>,
   )
   return onEdit
 }
 
 describe('AccountRow', () => {
-  it('shows the name, the formatted balance and the settings', () => {
+  beforeEach(() => {
+    vi.mocked(fetchBalance).mockResolvedValue({
+      account_id: 1,
+      as_of: null,
+      opening_balance_paise: 12_345_678,
+      postings_paise: 0,
+      balance_paise: 12_345_678,
+    })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows the name, the balance worked out from its movements, and the settings', async () => {
     renderRow(SAVINGS)
 
     expect(screen.getByText('SBI')).toBeInTheDocument()
-    expect(screen.getByText(formatPaise(12_345_678))).toBeInTheDocument()
+    expect(await screen.findByText('₹1,23,456.78')).toBeInTheDocument()
+    expect(screen.getByText(/Opening .* \+ movements/)).toBeInTheDocument()
     expect(screen.getByText(/Savings · Statement import · from 2026-04-01/)).toBeInTheDocument()
   })
 

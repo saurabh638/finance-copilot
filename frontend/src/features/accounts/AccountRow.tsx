@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { formatPaise } from '../../lib/money'
+import AccountBalance from './AccountBalance'
 import type { Account } from './api'
 import { ACCOUNT_TYPE_LABELS, CAPTURE_MODE_LABELS } from './form'
 
@@ -26,7 +26,7 @@ export default function AccountRow({
     <li className="rounded border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-medium text-slate-900">{account.name}</h3>
-        <span className="text-slate-900">{formatPaise(account.opening_balance_paise)}</span>
+        <AccountBalance accountId={account.id} />
       </div>
       <p className="mt-1 text-sm text-slate-600">
         {ACCOUNT_TYPE_LABELS[account.type]} · {CAPTURE_MODE_LABELS[account.capture_mode]} · from{' '}

@@ -11,11 +11,24 @@ import {
   createRate,
   deleteRate,
   fetchAccounts,
+  fetchBalance,
   fetchRates,
   updateAccount,
 } from './api'
 
 const ACCOUNTS_KEY = ['accounts'] as const
+
+/**
+ * Balances are cached per account.
+ *
+ * The prefix is exported because a balance is derived from postings: recording,
+ * correcting or removing a movement has to drop every one of these caches.
+ */
+export const BALANCES_KEY = 'account-balance'
+
+export function balanceKey(accountId: number) {
+  return [BALANCES_KEY, accountId] as const
+}
 
 /** Rates are cached per account, and only asked for when a panel opens. */
 function ratesKey(accountId: number) {
@@ -73,6 +86,11 @@ export function useCreateAccount() {
 /** The account's dated rates, newest first. Mount it only when a panel is open. */
 export function useRates(accountId: number) {
   return useQuery({ queryKey: ratesKey(accountId), queryFn: () => fetchRates(accountId) })
+}
+
+/** One account's balance, refreshed whenever a movement touches its postings. */
+export function useBalance(accountId: number) {
+  return useQuery({ queryKey: balanceKey(accountId), queryFn: () => fetchBalance(accountId) })
 }
 
 /** Save an account's editable fields; the list refetches on success. */

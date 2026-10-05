@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { fetchSession } from '../../lib/api'
 import AccountsPage from './AccountsPage'
-import { createAccount, createRate, fetchAccounts, fetchRates, updateAccount } from './api'
+import {
+  createAccount,
+  createRate,
+  fetchAccounts,
+  fetchBalance,
+  fetchRates,
+  updateAccount,
+} from './api'
 import type { Account } from './api'
 
 vi.mock('../../lib/api')
@@ -53,17 +60,26 @@ describe('AccountsPage', () => {
     vi.mocked(fetchSession).mockResolvedValue(USER)
     vi.mocked(fetchAccounts).mockResolvedValue([SAVINGS])
     vi.mocked(fetchRates).mockResolvedValue([])
+    vi.mocked(fetchBalance).mockResolvedValue({
+      account_id: 1,
+      as_of: null,
+      opening_balance_paise: 12_345_678,
+      postings_paise: -50_000,
+      balance_paise: 12_295_678,
+    })
   })
 
   afterEach(() => {
     vi.clearAllMocks()
   })
 
-  it('lists each account with its money formatted in rupees', async () => {
+  it('lists each account with its balance as the movements left it', async () => {
     renderPage()
 
     expect(await screen.findByText('SBI')).toBeInTheDocument()
-    expect(screen.getByText('₹1,23,456.78')).toBeInTheDocument()
+    // The opening balance was ₹1,23,456.78; ₹500 has left since.
+    expect(await screen.findByText('₹1,22,956.78')).toBeInTheDocument()
+    expect(screen.getByText(/Opening ₹1,23,456.78 \+ movements -₹500.00/)).toBeInTheDocument()
     expect(screen.getByText(/Signed in as owner@example.com/)).toBeInTheDocument()
   })
 

@@ -12,6 +12,7 @@ export type Account = components['schemas']['AccountResponse']
 export type AccountCreate = components['schemas']['AccountCreate']
 export type AccountType = components['schemas']['AccountType']
 export type AccountUpdate = components['schemas']['AccountUpdate']
+export type Balance = components['schemas']['BalanceResponse']
 export type CaptureMode = components['schemas']['CaptureMode']
 export type InterestRate = components['schemas']['InterestRateResponse']
 export type InterestRateCreate = components['schemas']['InterestRateCreate']
@@ -58,4 +59,14 @@ export function deleteRate(accountId: number, rateId: number): Promise<void> {
   return requestNoContent(`${ACCOUNTS_PATH}/${accountId}/interest-rates/${rateId}`, {
     method: 'DELETE',
   })
+}
+
+/**
+ * The account's balance, worked out from its opening balance and its postings.
+ *
+ * The opening balance and the postings total come back with it, so the figure
+ * can always be explained rather than merely trusted.
+ */
+export function fetchBalance(accountId: number): Promise<Balance> {
+  return requestJson<Balance>(`${ACCOUNTS_PATH}/${accountId}/balance`)
 }
