@@ -12,7 +12,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.core.ledger import difference_paise, is_large_adjustment, share_percent
-from app.models import BalanceCheck, Posting, PostingKind, Transaction
+from app.models import Account, BalanceCheck, Posting, PostingKind, Transaction
 from app.services.accounts import get_account
 from app.services.transactions import balance, record_adjustment, require_on_or_after_opening
 
@@ -20,6 +20,14 @@ from app.services.transactions import balance, record_adjustment, require_on_or_
 # of the difference decides which of the two it is.
 NOTE_UNACCOUNTED = "Unaccounted for spending"
 NOTE_FOUND = "Unrecorded income"
+
+
+class BalanceCheckNotFoundError(LookupError):
+    """Raised when a check does not exist for the user's account."""
+
+
+class BalanceCheckConflictError(ValueError):
+    """Raised when a check cannot be written off in the state it is in."""
 
 
 @dataclass(frozen=True)
@@ -59,6 +67,36 @@ def note_for(difference_paise: int) -> str:
     return NOTE_FOUND if difference_paise > 0 else NOTE_UNACCOUNTED
 
 
+def _record(check: BalanceCheck, adjustment_transaction_id: int | None) -> BalanceCheckRecord:
+    """One check as the API reports it, from the row that keeps it."""
+    return BalanceCheckRecord(
+        id=check.id,
+        account_id=check.account_id,
+        checked_on=check.checked_on,
+        computed_balance_paise=check.computed_paise,
+        stated_balance_paise=check.stated_paise,
+        difference_paise=check.difference_paise,
+        adjustment_transaction_id=adjustment_transaction_id,
+    )
+
+
+def _write_off(db: DbSession, user_id: int, account: Account, check: BalanceCheck) -> int:
+    """Post the difference a check recorded, and point the check at the posting."""
+    transaction = record_adjustment(
+        db,
+        user_id,
+        account.id,
+        check.difference_paise,
+        check.checked_on,
+        note_for(check.difference_paise),
+    )
+    check.adjustment_posting_id = db.scalars(
+        select(Posting.id).where(Posting.transaction_id == transaction.id)
+    ).one()
+    db.commit()
+    return transaction.id
+
+
 def check_balance(
     db: DbSession,
     user_id: int,
@@ -82,44 +120,61 @@ def check_balance(
     computed = balance(db, user_id, account.id, as_of=on).balance_paise
     difference = difference_paise(computed_paise=computed, stated_paise=stated_paise)
 
-    adjustment_transaction_id: int | None = None
-    adjustment_posting_id: int | None = None
-    if adjust and difference != 0:
-        transaction = record_adjustment(
-            db,
-            user_id,
-            account.id,
-            difference,
-            on,
-            note_for(difference),
-        )
-        adjustment_transaction_id = transaction.id
-        adjustment_posting_id = db.scalars(
-            select(Posting.id).where(Posting.transaction_id == transaction.id)
-        ).one()
-
     check = BalanceCheck(
         account_id=account.id,
         checked_on=on,
         computed_paise=computed,
         stated_paise=stated_paise,
         difference_paise=difference,
-        adjustment_posting_id=adjustment_posting_id,
     )
     db.add(check)
     db.commit()
 
+    adjustment_transaction_id: int | None = None
+    if adjust and difference != 0:
+        adjustment_transaction_id = _write_off(db, user_id, account, check)
+
     return BalanceCheckOutcome(
-        record=BalanceCheckRecord(
-            id=check.id,
-            account_id=check.account_id,
-            checked_on=check.checked_on,
-            computed_balance_paise=check.computed_paise,
-            stated_balance_paise=check.stated_paise,
-            difference_paise=check.difference_paise,
-            adjustment_transaction_id=adjustment_transaction_id,
-        ),
+        record=_record(check, adjustment_transaction_id),
         warning=is_large_adjustment(difference, warning_threshold_paise),
+        threshold_paise=warning_threshold_paise,
+    )
+
+
+def adjust_check(
+    db: DbSession,
+    user_id: int,
+    account_id: int,
+    check_id: int,
+    warning_threshold_paise: int,
+) -> BalanceCheckOutcome:
+    """Write off the difference a check found earlier.
+
+    The figures were recorded when the user looked, so this posts *those* - it
+    never re-reads the balance and arrives at a different number. A check that
+    has already been written off is refused, so one check can never post twice,
+    and a check with no difference has nothing to write off.
+    """
+    account = get_account(db, user_id, account_id)
+    check = db.scalars(
+        select(BalanceCheck).where(
+            BalanceCheck.id == check_id,
+            BalanceCheck.account_id == account.id,
+            BalanceCheck.deleted_at.is_(None),
+        )
+    ).first()
+    if check is None:
+        raise BalanceCheckNotFoundError(check_id)
+    if check.adjustment_posting_id is not None:
+        raise BalanceCheckConflictError("this check has already been written off")
+    if check.difference_paise == 0:
+        raise BalanceCheckConflictError("this check has nothing to write off")
+
+    transaction_id = _write_off(db, user_id, account, check)
+
+    return BalanceCheckOutcome(
+        record=_record(check, transaction_id),
+        warning=is_large_adjustment(check.difference_paise, warning_threshold_paise),
         threshold_paise=warning_threshold_paise,
     )
 
@@ -139,18 +194,7 @@ def list_checks(db: DbSession, user_id: int, account_id: int) -> list[BalanceChe
         .order_by(BalanceCheck.checked_on.desc(), BalanceCheck.id.desc())
     )
 
-    return [
-        BalanceCheckRecord(
-            id=check.id,
-            account_id=check.account_id,
-            checked_on=check.checked_on,
-            computed_balance_paise=check.computed_paise,
-            stated_balance_paise=check.stated_paise,
-            difference_paise=check.difference_paise,
-            adjustment_transaction_id=transaction_id,
-        )
-        for check, transaction_id in db.execute(statement).all()
-    ]
+    return [_record(check, transaction_id) for check, transaction_id in db.execute(statement).all()]
 
 
 def adjustment_share(db: DbSession, user_id: int, account_id: int, month: date) -> AdjustmentShare:

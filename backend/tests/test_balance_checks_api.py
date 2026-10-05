@@ -8,6 +8,7 @@ balance must equal the stated balance exactly, with no paise gained or lost.
 from datetime import date
 
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -65,6 +66,10 @@ def _balance(client: TestClient, account_id: int) -> int:
 
 def _share(client: TestClient, account_id: int, month: str) -> dict[str, object]:
     return client.get(f"/api/v1/accounts/{account_id}/adjustment-share?month={month}").json()
+
+
+def _adjust(client: TestClient, account_id: int, check_id: int) -> Response:
+    return client.post(f"/api/v1/accounts/{account_id}/balance-checks/{check_id}/adjust")
 
 
 def _expense(client: TestClient, account_id: int, paise: int, on: str) -> None:
@@ -360,3 +365,79 @@ def test_last_months_spending_is_not_counted_this_month(
 
     assert september["spend_paise"] == 9_00_000
     assert october["spend_paise"] == 0
+
+
+# --- writing off a check that was made earlier ---
+
+
+def test_a_recorded_check_can_be_written_off_later(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    stated = OPENING_PAISE - 500_00
+    check = _check(client, account_id, stated, adjust=False).json()
+    assert check["adjustment_transaction_id"] is None
+
+    response = _adjust(client, account_id, check["id"])
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["difference_paise"] == -500_00
+    assert body["adjustment_transaction_id"] is not None
+    assert _balance(client, account_id) == stated
+    # The write-off is dated the day the balance was checked, not the day it was
+    # written off, so the ledger reads as it did when the user looked.
+    written_off = client.get("/api/v1/transactions?kind=adjustment").json()
+    assert [t["transaction_date"] for t in written_off] == [CHECKED_ON]
+    assert written_off[0]["note"] == "Unaccounted for spending"
+
+
+def test_a_check_cannot_be_written_off_twice(client: TestClient, db: Session, user: User) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    check = _check(client, account_id, OPENING_PAISE - 500_00, adjust=False).json()
+    _adjust(client, account_id, check["id"])
+
+    again = _adjust(client, account_id, check["id"])
+
+    assert again.status_code == 409
+    assert "already" in again.json()["detail"]
+    assert len(client.get("/api/v1/transactions?kind=adjustment").json()) == 1
+    assert _balance(client, account_id) == OPENING_PAISE - 500_00
+
+
+def test_a_matching_check_has_nothing_to_write_off(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    check = _check(client, account_id, OPENING_PAISE, adjust=False).json()
+
+    response = _adjust(client, account_id, check["id"])
+
+    assert response.status_code == 409
+    assert "nothing to write off" in response.json()["detail"]
+    assert client.get("/api/v1/transactions").json() == []
+
+
+def test_only_your_own_checks_can_be_written_off(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    other = create_user(db, "someone@example.com", "another-passphrase")
+    other_account_id = _account(db, other, name="Not yours")
+    other_check = _check(client, other_account_id, OPENING_PAISE - 500_00, adjust=False)
+    assert other_check.status_code == 404
+
+    assert _adjust(client, 1, 1).status_code == 404
+    assert _adjust(client, 999, 1).status_code == 404
+
+
+def test_writing_off_a_check_that_is_not_there_answers_404(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+
+    assert _adjust(client, account_id, 999).status_code == 404

@@ -32,6 +32,7 @@ from app.services.accounts import (
     soft_delete_account,
     update_account,
 )
+from app.services.balance_checks import BalanceCheckConflictError, BalanceCheckNotFoundError
 from app.services.interest_rates import DuplicateRateError, RateNotFoundError
 from app.services.transactions import InvalidTransactionError
 
@@ -234,6 +235,14 @@ def _too_early(error: InvalidTransactionError) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
+def _check_not_found(check_id: int) -> HTTPException:
+    """The single 404 raised for a check that is not there."""
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Balance check {check_id} does not exist",
+    )
+
+
 @router.post(
     "/{account_id}/balance-checks",
     response_model=BalanceCheckResponse,
@@ -294,6 +303,50 @@ def index_balance_checks(
         raise _not_found(account_id) from error
 
     return [BalanceCheckSummaryResponse.model_validate(record) for record in found]
+
+
+@router.post(
+    "/{account_id}/balance-checks/{check_id}/adjust",
+    response_model=BalanceCheckResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "The account or the check does not exist"},
+        status.HTTP_409_CONFLICT: {
+            "description": "The check is already written off, or has no difference"
+        },
+    },
+)
+def adjust_balance_check(
+    account_id: int,
+    check_id: int,
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BalanceCheckResponse:
+    """Write off the difference a check found earlier.
+
+    The figures are the ones recorded at the time, so the write-off cannot drift
+    from what the user actually saw.
+    """
+    try:
+        outcome = balance_checks.adjust_check(
+            db,
+            user.id,
+            account_id,
+            check_id,
+            get_settings().balance_check_warning_paise,
+        )
+    except AccountNotFoundError as error:
+        raise _not_found(account_id) from error
+    except BalanceCheckNotFoundError as error:
+        raise _check_not_found(check_id) from error
+    except BalanceCheckConflictError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+    summary = BalanceCheckSummaryResponse.model_validate(outcome.record)
+    return BalanceCheckResponse(
+        **summary.model_dump(),
+        warning=outcome.warning,
+        threshold_paise=outcome.threshold_paise,
+    )
 
 
 @router.get(
