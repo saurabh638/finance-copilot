@@ -55,7 +55,7 @@ def record_expense(
     """Record money leaving an account. Give the amount as a positive number."""
     _require_positive(amount_paise)
     account = get_account(db, user_id, account_id)
-    _require_on_or_after_opening(account, on)
+    require_on_or_after_opening(account, on)
 
     return _record(
         db,
@@ -79,7 +79,7 @@ def record_income(
     """Record money arriving. Give the amount as a positive number."""
     _require_positive(amount_paise)
     account = get_account(db, user_id, account_id)
-    _require_on_or_after_opening(account, on)
+    require_on_or_after_opening(account, on)
 
     return _record(
         db,
@@ -107,8 +107,8 @@ def record_transfer(
 
     source = get_account(db, user_id, from_account_id)
     destination = get_account(db, user_id, to_account_id)
-    _require_on_or_after_opening(source, on)
-    _require_on_or_after_opening(destination, on)
+    require_on_or_after_opening(source, on)
+    require_on_or_after_opening(destination, on)
 
     out_of_source, into_destination = transfer_amounts(amount_paise)
     return _record(
@@ -119,6 +119,36 @@ def record_transfer(
             (source.id, out_of_source, PostingKind.TRANSFER),
             (destination.id, into_destination, PostingKind.TRANSFER),
         ],
+        note=note,
+    )
+
+
+def record_adjustment(
+    db: DbSession,
+    user_id: int,
+    account_id: int,
+    amount_paise: int,
+    on: date,
+    note: str | None = None,
+) -> Transaction:
+    """Write off the gap between the ledger and the bank.
+
+    The amount is the signed difference, so it may be negative or positive: here
+    the sign *is* the answer, which is why this is the one movement that does not
+    take a positive amount and let the kind decide. Writing off nothing is not a
+    movement, so a zero is refused.
+    """
+    if amount_paise == 0:
+        raise InvalidTransactionError("an adjustment must change the balance")
+
+    account = get_account(db, user_id, account_id)
+    require_on_or_after_opening(account, on)
+
+    return _record(
+        db,
+        user_id,
+        on,
+        [(account.id, amount_paise, PostingKind.ADJUSTMENT)],
         note=note,
     )
 
@@ -250,8 +280,12 @@ def _require_positive(amount_paise: int) -> None:
         )
 
 
-def _require_on_or_after_opening(account: Account, on: date) -> None:
-    """The opening balance already describes the account before it opened."""
+def require_on_or_after_opening(account: Account, on: date) -> None:
+    """The opening balance already describes the account before it opened.
+
+    Public because anything dated - a movement or a balance check - has to obey
+    the same rule, and one rule in one place is the point.
+    """
     if on < account.opening_date:
         raise InvalidTransactionError(
             f"{account.name} opened on {account.opening_date}, so {on} is too early"
@@ -324,7 +358,7 @@ def update_transaction(
         for posting in postings:
             account = db.get(Account, posting.account_id)
             if account is not None:
-                _require_on_or_after_opening(account, changes.transaction_date)
+                require_on_or_after_opening(account, changes.transaction_date)
         transaction.transaction_date = changes.transaction_date
 
     # An omitted field is left alone; an explicit null clears it.
