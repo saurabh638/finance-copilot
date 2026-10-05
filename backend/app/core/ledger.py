@@ -3,13 +3,16 @@
 No I/O, no database, no clock and no floats. Every amount is a whole number of
 paise and every date is given, so the same postings always produce the same
 balance. Callers fetch the postings; nothing here reaches for anything.
+
+It also holds the balance check: what the bank says against what the ledger says,
+and the figures that decide whether a write-off is worth a second look.
 """
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from app.core.money import add_paise
+from app.core.money import add_paise, subtract_paise
 
 
 @dataclass(frozen=True)
@@ -69,3 +72,39 @@ def is_balanced(amounts: Sequence[int]) -> bool:
     if len(amounts) == 1:
         return True
     return sum_paise(amounts) == 0
+
+
+def difference_paise(computed_paise: int, stated_paise: int) -> int:
+    """What the bank says minus what the ledger says, in whole paise.
+
+    This is exactly what a write-off has to post: the computed balance plus this
+    difference lands on the stated balance, with no paise gained or lost. A
+    positive figure is money the ledger never knew about; a negative one is
+    spending that went unrecorded.
+    """
+    return subtract_paise(stated_paise, computed_paise)
+
+
+def is_large_adjustment(difference_paise: int, threshold_paise: int) -> bool:
+    """True when a write-off is big enough to be worth a second look first.
+
+    The size matters, not the direction: money missing and money found are both
+    worth asking about. A write-off exactly at the threshold is not above it, and
+    nothing to write off is never large.
+    """
+    return abs(difference_paise) > threshold_paise
+
+
+def share_percent(adjustments_paise: int, spend_paise: int) -> int:
+    """Write-offs as a whole percent of spending, rounded to the nearest.
+
+    Both figures are magnitudes, because a share does not care which way either
+    one went. With nothing spent there is no share to state, so the answer is 0
+    rather than a division by zero. Rounded with integers alone, so no float and
+    no lost paise are involved.
+    """
+    if adjustments_paise < 0 or spend_paise < 0:
+        raise ValueError("a share needs magnitudes, not signed amounts")
+    if spend_paise == 0:
+        return 0
+    return (2 * adjustments_paise * 100 + spend_paise) // (2 * spend_paise)

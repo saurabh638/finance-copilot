@@ -11,7 +11,10 @@ import pytest
 from app.core.ledger import (
     DatedAmount,
     balance_paise,
+    difference_paise,
     is_balanced,
+    is_large_adjustment,
+    share_percent,
     sum_paise,
     transfer_amounts,
 )
@@ -139,3 +142,72 @@ def test_sum_paise_totals_whole_paise() -> None:
     assert sum_paise([1, 2, 3]) == 6
     assert sum_paise([]) == 0
     assert sum_paise([-1, 1]) == 0
+
+
+# --- the balance check: what the ledger says against what the bank says ---
+
+
+def test_money_short_is_a_negative_difference() -> None:
+    # The bank says there is less than the ledger thinks: spending went unrecorded.
+    assert difference_paise(computed_paise=1_00_000, stated_paise=95_000) == -5_000
+
+
+def test_money_found_is_a_positive_difference() -> None:
+    # The bank says there is more: income arrived that was never entered.
+    assert difference_paise(computed_paise=1_00_000, stated_paise=1_05_000) == 5_000
+
+
+def test_a_matching_balance_has_no_difference() -> None:
+    assert difference_paise(computed_paise=1_23_456_78, stated_paise=1_23_456_78) == 0
+
+
+def test_the_difference_keeps_every_paise_of_a_large_one() -> None:
+    assert difference_paise(computed_paise=99_999_999_99, stated_paise=1) == -99_999_999_98
+
+
+def test_the_difference_is_what_the_adjustment_must_post() -> None:
+    # Opening balance plus a written-off difference lands exactly on the stated one.
+    for computed, stated in ((1_00_000, 95_000), (95_000, 1_00_000), (1, 1), (0, -50_000)):
+        difference = difference_paise(computed_paise=computed, stated_paise=stated)
+
+        assert computed + difference == stated
+
+
+def test_a_write_off_at_the_threshold_is_not_yet_large() -> None:
+    assert is_large_adjustment(difference_paise=1_00_000, threshold_paise=1_00_000) is False
+    assert is_large_adjustment(difference_paise=1_00_001, threshold_paise=1_00_000) is True
+
+
+def test_a_large_write_off_is_large_in_either_direction() -> None:
+    assert is_large_adjustment(difference_paise=-2_00_000, threshold_paise=1_00_000) is True
+    assert is_large_adjustment(difference_paise=2_00_000, threshold_paise=1_00_000) is True
+    assert is_large_adjustment(difference_paise=-1, threshold_paise=1_00_000) is False
+
+
+def test_nothing_written_off_is_never_large() -> None:
+    assert is_large_adjustment(difference_paise=0, threshold_paise=0) is False
+
+
+def test_a_share_of_spending_is_a_whole_percent() -> None:
+    # ₹600 written off against ₹20,000 of spending is 3%.
+    assert share_percent(adjustments_paise=60_000, spend_paise=20_00_000) == 3
+    assert share_percent(adjustments_paise=0, spend_paise=20_00_000) == 0
+
+
+def test_a_share_rounds_to_the_nearest_percent() -> None:
+    assert share_percent(adjustments_paise=1_00_000, spend_paise=1_00_000) == 100
+    assert share_percent(adjustments_paise=1_50_000, spend_paise=1_00_000) == 150
+    # 1.5% rounds up, 1.4% rounds down: no float is involved either way.
+    assert share_percent(adjustments_paise=3, spend_paise=200) == 2
+    assert share_percent(adjustments_paise=7, spend_paise=500) == 1
+
+
+def test_a_share_of_nothing_spent_is_not_a_percentage() -> None:
+    assert share_percent(adjustments_paise=50_000, spend_paise=0) == 0
+
+
+def test_a_share_needs_magnitudes_not_signs() -> None:
+    with pytest.raises(ValueError, match="magnitudes"):
+        share_percent(adjustments_paise=-1, spend_paise=1_00_000)
+    with pytest.raises(ValueError, match="magnitudes"):
+        share_percent(adjustments_paise=1, spend_paise=-1_00_000)
