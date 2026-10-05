@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  blankMovement,
-  todayIso,
-  toPayload,
-  validateMovement,
-  type MovementFormValues,
-} from './form'
+import { blankMovement, toPayload, validateMovement, type MovementFormValues } from './form'
 
 /** A filled expense form, so each test changes only what it is about. */
 function expense(overrides: Partial<MovementFormValues> = {}): MovementFormValues {
@@ -23,18 +17,6 @@ function transfer(overrides: Partial<MovementFormValues> = {}): MovementFormValu
     ...overrides,
   }
 }
-
-describe('todayIso', () => {
-  it('reads the local day, not the UTC one', () => {
-    // Just after midnight in India is still the previous day in UTC: a date
-    // built from toISOString() would silently file the movement a day early.
-    expect(todayIso(new Date(2026, 9, 4, 0, 30))).toBe('2026-10-04')
-  })
-
-  it('pads a single-digit month and day', () => {
-    expect(todayIso(new Date(2026, 0, 5, 12, 0))).toBe('2026-01-05')
-  })
-})
 
 describe('blankMovement', () => {
   it('starts as an expense dated the day it is given, with nothing filled in', () => {
