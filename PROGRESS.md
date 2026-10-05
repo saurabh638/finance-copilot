@@ -19,7 +19,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M7 Postings and ledger core | done | `Transaction` and `Posting` models, migration 0006, pure `core/ledger.py`, expense/income/transfer services, and the balance endpoint. Approved. |
 | M8a Transactions API | done | Recording, reading back, editing and soft-deleting a movement: `POST`/`GET /api/v1/transactions` and `GET`/`PATCH`/`DELETE /api/v1/transactions/{id}`. The create body is a discriminated union on `kind`. Approved. |
 | M8b Transactions screen | done | Transactions tab: the list newest first, account and date filters, and one form that records an expense, an income or a transfer. Balances still live on the API only. Approved. |
-| M8c Edit, delete and balances in the UI | not started | Editing and deleting from the screen, with each account's balance shown. |
+| M8c Edit, delete and balances in the UI | done | A movement opens pre-filled for correction, removal asks first and is soft, and each account shows the balance it was worked out from. M8 is complete. Approved. |
 | M9 Balance check and write-off | not started | |
 | M10 Categories | not started | |
 | M11 Daily check-in screen | not started | |
@@ -36,18 +36,19 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-The app now opens on the Transactions tab: a movement can be recorded, listed and filtered by hand, and
-M8a's API backs it. **M8c is next** — editing, soft-deleting and balances in that screen — after which M8
-is complete and the two-week Phase 0 gate can begin.
+**M8 is complete**: a movement can be recorded, listed, filtered, corrected and removed by hand, and
+each account shows the balance those movements produced. **M9 is next** — the balance check and
+write-off — after which the two-week Phase 0 gate can begin.
 
 Before the app holds real data:
 
 - Running `seed` for real needs the 12 values only the user can give: for each of the six accounts, the
   balance that was true on a start date, and that date. Nothing else blocks it.
 - The development database was rebuilt from empty in M7 and holds two accounts (SBI, Central Bank) and
-  nine transactions recorded through the API and the screen during the M7, M8a and M8b walkthroughs, one
-  of them soft-deleted. They are dummy entries with no real balances, kept for now so there is something
-  to look at. `seed --demo` restores the six placeholders; `docker compose down -v` clears everything.
+  nine movements recorded through the API and the screen during the M7, M8a, M8b and M8c walkthroughs,
+  seven of them live and two removed from the screen. They are dummy entries with no real balances, kept
+  for now so there is something to look at. `seed --demo` restores the six placeholders;
+  `docker compose down -v` clears everything.
 - Take a backup before any risky change: `./scripts/backup.sh`.
 
 ## Open questions
@@ -59,3 +60,8 @@ Before the app holds real data:
   changes nothing. Proposed: reject unknown fields with 422 instead of ignoring them.
 - The account routes do not declare their 404/400 responses, so `/docs` lists only 401/422 for
   them; the rate routes declare theirs. Documentation-only follow-up.
+- A removed movement cannot be reached from the screen: the row disappears and the balance moves, with
+  no way to list or restore it. Proposed: a `?removed=true` filter plus an undelete, either inside M9's
+  balance check or as its own small change.
+- The Accounts screen asks for one balance per account. That is a handful of cached calls today; past
+  roughly twenty accounts it should become a single `GET /accounts/balances`.
