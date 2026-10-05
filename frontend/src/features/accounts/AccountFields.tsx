@@ -1,7 +1,7 @@
 import type { Account } from './api'
-import Field, { INPUT_CLASS } from './Field'
-import SelectField from './SelectField'
-import TextField from './TextField'
+import Field, { INPUT_CLASS } from '../../components/Field'
+import SelectField from '../../components/SelectField'
+import TextField from '../../components/TextField'
 import {
   ACCOUNT_TYPES,
   ACCOUNT_TYPE_LABELS,

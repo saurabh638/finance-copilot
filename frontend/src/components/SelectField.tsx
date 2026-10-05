@@ -10,7 +10,7 @@ interface SelectFieldProps<T extends string> {
   onChange: (value: T) => void
 }
 
-/** A labelled select. Options come from the enum labels in `form.ts`. */
+/** A labelled select. `labels` names each option; the value is the stored one. */
 export default function SelectField<T extends string>({
   label,
   id,

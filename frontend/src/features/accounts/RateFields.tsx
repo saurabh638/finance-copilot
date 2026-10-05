@@ -1,6 +1,6 @@
 import type { RateFrequency } from './api'
-import SelectField from './SelectField'
-import TextField from './TextField'
+import SelectField from '../../components/SelectField'
+import TextField from '../../components/TextField'
 import { RATE_FREQUENCIES, RATE_FREQUENCY_LABELS } from './form'
 
 interface RateFieldsProps {

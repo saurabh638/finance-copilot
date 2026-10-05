@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { useLogout, useSession } from '../auth/useSession'
+import PageHeader from '../../components/PageHeader'
 import AccountEditor from './AccountEditor'
 import AccountForm from './AccountForm'
 import AccountRow from './AccountRow'
@@ -12,8 +12,6 @@ import { type NewAccount, useAccounts, useCreateAccount } from './useAccounts'
  * Money comes from the API as integer paise and is only ever formatted here.
  */
 export default function AccountsPage() {
-  const session = useSession()
-  const logout = useLogout()
   const accounts = useAccounts()
   const createAccount = useCreateAccount()
   const [isAdding, setIsAdding] = useState(false)
@@ -40,20 +38,7 @@ export default function AccountsPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Accounts</h1>
-          <p className="mt-1 text-slate-700">Signed in as {session.data?.email}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => logout.mutate()}
-          disabled={logout.isPending}
-          className="min-h-11 rounded bg-slate-900 px-4 text-white disabled:opacity-60"
-        >
-          Log out
-        </button>
-      </header>
+      <PageHeader title="Accounts" />
 
       {notice !== null && (
         <p role="status" className="mt-4 rounded bg-amber-50 px-3 py-2 text-amber-900">

@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
-import SelectField from './SelectField'
-import TextField from './TextField'
+import SelectField from '../../components/SelectField'
+import TextField from '../../components/TextField'
 import type { RateFrequency } from './api'
 import { RATE_FREQUENCIES, RATE_FREQUENCY_LABELS, isValidRateText } from './form'
 import { useAddRate, useDeleteRate, useRates } from './useAccounts'
