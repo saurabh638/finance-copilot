@@ -12,7 +12,11 @@ export type Account = components['schemas']['AccountResponse']
 export type AccountCreate = components['schemas']['AccountCreate']
 export type AccountType = components['schemas']['AccountType']
 export type AccountUpdate = components['schemas']['AccountUpdate']
+export type AdjustmentShare = components['schemas']['AdjustmentShareResponse']
 export type Balance = components['schemas']['BalanceResponse']
+export type BalanceCheck = components['schemas']['BalanceCheckResponse']
+export type BalanceCheckCreate = components['schemas']['BalanceCheckCreate']
+export type BalanceCheckSummary = components['schemas']['BalanceCheckSummaryResponse']
 export type CaptureMode = components['schemas']['CaptureMode']
 export type InterestRate = components['schemas']['InterestRateResponse']
 export type InterestRateCreate = components['schemas']['InterestRateCreate']
@@ -69,4 +73,35 @@ export function deleteRate(accountId: number, rateId: number): Promise<void> {
  */
 export function fetchBalance(accountId: number): Promise<Balance> {
   return requestJson<Balance>(`${ACCOUNTS_PATH}/${accountId}/balance`)
+}
+
+/**
+ * Compare the ledger with the bank.
+ *
+ * Nothing is written off unless `adjust` says so, which is what lets the screen
+ * show the figures and the nudge before anything is posted.
+ */
+export function createBalanceCheck(
+  accountId: number,
+  payload: BalanceCheckCreate,
+): Promise<BalanceCheck> {
+  return requestJson<BalanceCheck>(`${ACCOUNTS_PATH}/${accountId}/balance-checks`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+/** Write off the difference a check found earlier, using its recorded figures. */
+export function adjustBalanceCheck(accountId: number, checkId: number): Promise<BalanceCheck> {
+  return requestJson<BalanceCheck>(
+    `${ACCOUNTS_PATH}/${accountId}/balance-checks/${checkId}/adjust`,
+    { method: 'POST' },
+  )
+}
+
+/** Write-offs against the month's spending, for the month given. */
+export function fetchAdjustmentShare(accountId: number, month: string): Promise<AdjustmentShare> {
+  return requestJson<AdjustmentShare>(
+    `${ACCOUNTS_PATH}/${accountId}/adjustment-share?month=${encodeURIComponent(month)}`,
+  )
 }

@@ -200,6 +200,76 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/accounts/{account_id}/balance-checks': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Index Balance Checks
+     * @description The account's balance checks, most recent first.
+     */
+    get: operations['index_balance_checks_api_v1_accounts__account_id__balance_checks_get']
+    put?: never
+    /**
+     * Create Balance Check
+     * @description Compare the ledger with the bank, and write the difference off if asked.
+     *
+     *     The threshold is advice, not a rule: a large difference is flagged and the
+     *     write-off still happens when the user has decided on it.
+     */
+    post: operations['create_balance_check_api_v1_accounts__account_id__balance_checks_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/accounts/{account_id}/balance-checks/{check_id}/adjust': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Adjust Balance Check
+     * @description Write off the difference a check found earlier.
+     *
+     *     The figures are the ones recorded at the time, so the write-off cannot drift
+     *     from what the user actually saw.
+     */
+    post: operations['adjust_balance_check_api_v1_accounts__account_id__balance_checks__check_id__adjust_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/accounts/{account_id}/adjustment-share': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Read Adjustment Share
+     * @description Write-offs as a share of the month's spending, for the month given.
+     */
+    get: operations['read_adjustment_share_api_v1_accounts__account_id__adjustment_share_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/transactions': {
     parameters: {
       query?: never
@@ -356,6 +426,94 @@ export interface components {
       due_day?: number | null
       /** Is Active */
       is_active?: boolean | null
+    }
+    /**
+     * AdjustmentShareResponse
+     * @description Write-offs against spending for one month, as positive magnitudes.
+     */
+    AdjustmentShareResponse: {
+      /**
+       * Month
+       * Format: date
+       */
+      month: string
+      /** Spend Paise */
+      spend_paise: number
+      /** Adjustments Paise */
+      adjustments_paise: number
+      /** Share Percent */
+      share_percent: number
+    }
+    /**
+     * BalanceCheckCreate
+     * @description What the user brings: the real balance, and whether to write the gap off.
+     *
+     *     `adjust` has no default on purpose. Writing a difference off moves real
+     *     figures, so the request has to say what it wants rather than have it assumed.
+     */
+    BalanceCheckCreate: {
+      /**
+       * On
+       * Format: date
+       */
+      on: string
+      /** Stated Balance Paise */
+      stated_balance_paise: number
+      /** Adjust */
+      adjust: boolean
+    }
+    /**
+     * BalanceCheckResponse
+     * @description The answer to a check just made, including the nudge.
+     *
+     *     The warning is advice about what has just happened by today's threshold, so
+     *     it belongs to this answer and not to the history of past checks.
+     */
+    BalanceCheckResponse: {
+      /** Id */
+      id: number
+      /** Account Id */
+      account_id: number
+      /**
+       * Checked On
+       * Format: date
+       */
+      checked_on: string
+      /** Computed Balance Paise */
+      computed_balance_paise: number
+      /** Stated Balance Paise */
+      stated_balance_paise: number
+      /** Difference Paise */
+      difference_paise: number
+      /** Adjustment Transaction Id */
+      adjustment_transaction_id: number | null
+      /** Warning */
+      warning: boolean
+      /** Threshold Paise */
+      threshold_paise: number
+    }
+    /**
+     * BalanceCheckSummaryResponse
+     * @description One check as it is kept: the figures, as they were at the time.
+     */
+    BalanceCheckSummaryResponse: {
+      /** Id */
+      id: number
+      /** Account Id */
+      account_id: number
+      /**
+       * Checked On
+       * Format: date
+       */
+      checked_on: string
+      /** Computed Balance Paise */
+      computed_balance_paise: number
+      /** Stated Balance Paise */
+      stated_balance_paise: number
+      /** Difference Paise */
+      difference_paise: number
+      /** Adjustment Transaction Id */
+      adjustment_transaction_id: number | null
     }
     /**
      * BalanceResponse
@@ -1037,6 +1195,179 @@ export interface operations {
         content?: never
       }
       /** @description The account or the rate does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  index_balance_checks_api_v1_accounts__account_id__balance_checks_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BalanceCheckSummaryResponse'][]
+        }
+      }
+      /** @description The account does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_balance_check_api_v1_accounts__account_id__balance_checks_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BalanceCheckCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BalanceCheckResponse']
+        }
+      }
+      /** @description The check date is before the account opened */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The account does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  adjust_balance_check_api_v1_accounts__account_id__balance_checks__check_id__adjust_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+        check_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BalanceCheckResponse']
+        }
+      }
+      /** @description The account or the check does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The check is already written off, or has no difference */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  read_adjustment_share_api_v1_accounts__account_id__adjustment_share_get: {
+    parameters: {
+      query?: {
+        month?: string | null
+      }
+      header?: never
+      path: {
+        account_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AdjustmentShareResponse']
+        }
+      }
+      /** @description The account does not exist */
       404: {
         headers: {
           [name: string]: unknown

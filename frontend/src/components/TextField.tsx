@@ -7,6 +7,8 @@ interface TextFieldProps {
   error?: string
   type?: 'text' | 'date'
   inputMode?: 'text' | 'decimal' | 'numeric'
+  /** Take focus when the field appears, for the first thing a person must fill in. */
+  autoFocus?: boolean
   onChange: (value: string) => void
 }
 
@@ -18,6 +20,7 @@ export default function TextField({
   error,
   type = 'text',
   inputMode = 'text',
+  autoFocus = false,
   onChange,
 }: TextFieldProps) {
   return (
@@ -26,6 +29,7 @@ export default function TextField({
         id={id}
         type={type}
         inputMode={inputMode}
+        autoFocus={autoFocus}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error !== undefined}
