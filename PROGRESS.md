@@ -23,7 +23,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M9a Balance check backend | done | `BalanceCheck` model, migration 0007, pure reconciliation maths, the service that posts the write-off as a visible `adjustment` posting, and three endpoints. Approved. |
 | M9b The ten-second screen | done | *Check balance* on an account: enter the real balance, see the ledger's figure, the bank's and the difference, then write it off or put it away, with the nudge and the month's share. M9 is complete. Approved. |
 | M10a The category tree | done | `Category` model, migration 0008 (the table and `postings.category_id`), the seeded Indian-household set, tree CRUD with its rules, and `seed-categories`. Approved. |
-| M10b Categories in use | not started | A movement carries a category; a write-off takes `Unaccounted for spending` or `Unrecorded income` by its sign; splits; spend by category. |
+| M10b Categories in use | done | A movement carries a category; a write-off takes `Unaccounted for spending` or `Unrecorded income` by its sign; a movement can be split between categories; spend by category. Approved. |
 | M10c The category screens | not started | The picker on the entry forms, the categories page, and the spend-by-category view. |
 | M11 Daily check-in screen | not started | |
 | M12 Recurring and scheduled items | not started | |
@@ -39,10 +39,11 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M10a is done**: the tree exists, seeded with a recognisable Indian-household set, and each account's
-movements can be filed under it once M10b lands. **M10b is next** — the write-off names attached first,
-then splits, which are the one change that touches the money rule — followed by M10c, the screens. The
-two-week Phase 0 gate can begin after M10c.
+**M10b is done**: money and the names it is filed under are joined up — a movement can be filed under one
+category, a purchase spread across several, a write-off takes the tree's own name for its direction, and
+`GET /categories/spend` answers what each category held in a period, with a branch's figure being the
+whole of its branch. **M10c is next** — the picker on the entry forms, the categories page, and the
+spend-by-category view — after which the two-week Phase 0 gate can begin.
 
 Before the app holds real data:
 
@@ -57,6 +58,11 @@ Before the app holds real data:
 - The development database has a category tree: the seeded 51 names over 18 top-level groups, created by
   `seed-categories`, plus one extra top-level name (*Filter coffee*) left by the M10a walkthrough. The two
   write-off names are in the tree. `docker compose down -v` clears this with the rest.
+- The M10b walkthrough added an account called *Walkthrough* (opening ₹1,00,000 on 2026-04-01) holding a
+  few October 2026 movements: two filed under *Groceries* and *Eating out* directly, one ₹500 shop split
+  between them, and two write-offs (₹220 found, ₹420 short) that filed themselves under *Unrecorded
+  income* and *Unaccounted for spending*. Its balance stands at the stated figure of its last check
+  (₹99,000). Nothing real, and useful for looking at M10c's screens.
 - Take a backup before any risky change: `./scripts/backup.sh`.
 
 ## Open questions
@@ -82,6 +88,19 @@ Before the app holds real data:
   adjustment a check points at, or mark it as belonging to a check. Not built in M9b.
 - The share is per account. The Phase 0 gate's "write-offs under 5% of spending" wants one figure across
   every account, which needs its own endpoint.
-- A write-off has no category until M10b: `category_id` is NULL and the wording
-  (`Unaccounted for spending` / `Unrecorded income`) sits in the note. The two names now exist in the
-  tree with kind `adjustment`; M10b attaches them by the sign of the difference.
+- A write-off is now filed under `Unaccounted for spending` or `Unrecorded income`, by the sign of its
+  difference. Renaming or removing those two names leaves a write-off unfiled, silently: it is the user's
+  tree, and the check is recorded either way, but nothing says the filing has gone. Proposed: a line in
+  the balance-check panel when the name is missing. Not built in M10b.
+- A movement may be split between categories, but every part must name one, and the parts must add up to
+  the amount exactly. A part with no category is not offered, because the user can leave the whole
+  movement unfiled instead. If real use asks for a half-filed split, that is a change to the request
+  shape rather than to the ledger.
+- Unknown fields are ignored rather than refused, so `parts` or `category_id` on a transfer payload is
+  accepted and dropped. Same open question as `PATCH /accounts` above; the fix is one rule for every
+  route rather than a second special case.
+- The spend report has no row for uncategorised spending, so its rows do not add up to total spending for
+  the period. Proposed: a report-only *Uncategorised* row, once the M10c screen shows the figure.
+- The spend report reads every matching posting and adds the figures up in Python, which is what keeps
+  money out of the database's arithmetic. One household's month is a few hundred rows; a decade of import
+  would want a grouped query, and that is a decision to make then, not now.
