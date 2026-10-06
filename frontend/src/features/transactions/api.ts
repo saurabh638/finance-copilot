@@ -12,6 +12,8 @@ export type ExpenseCreate = components['schemas']['ExpenseCreate']
 export type IncomeCreate = components['schemas']['IncomeCreate']
 export type Posting = components['schemas']['PostingResponse']
 export type PostingKind = components['schemas']['PostingKind']
+export type Streak = components['schemas']['StreakResponse']
+export type Suggestion = components['schemas']['SuggestionResponse']
 export type Transaction = components['schemas']['TransactionResponse']
 export type TransactionUpdate = components['schemas']['TransactionUpdate']
 export type TransferCreate = components['schemas']['TransferCreate']
@@ -22,7 +24,20 @@ export type MovementCreate = ExpenseCreate | IncomeCreate | TransferCreate
 /** How many movements one page holds. The server's own maximum is 200. */
 export const PAGE_SIZE = 50
 
+/** How many names the daily screen offers as chips. */
+export const SUGGESTION_LIMIT = 8
+
 const TRANSACTIONS_PATH = '/api/v1/transactions'
+
+/** The names worth offering for fast entry, most used first. */
+export function fetchSuggestions(limit: number = SUGGESTION_LIMIT): Promise<Suggestion[]> {
+  return requestJson<Suggestion[]>(`${TRANSACTIONS_PATH}/suggestions?limit=${String(limit)}`)
+}
+
+/** How many days in a row something has been recorded, and whether today is one. */
+export function fetchStreak(): Promise<Streak> {
+  return requestJson<Streak>(`${TRANSACTIONS_PATH}/streak`)
+}
 
 /** What the screen is currently showing. Empty text means "not filtered". */
 export interface TransactionFilters {

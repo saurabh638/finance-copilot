@@ -296,6 +296,50 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/transactions/suggestions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Suggestions
+     * @description The names worth offering for fast entry, most used first.
+     *
+     *     Each one carries how it was recorded last, so one tap records it again. `on`
+     *     is the day to count the window back from, and defaults to today; a client
+     *     sends it only when it is showing a day of its own.
+     */
+    get: operations['suggestions_api_v1_transactions_suggestions_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/transactions/streak': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Streak
+     * @description How many days in a row something has been recorded, and whether today is one.
+     */
+    get: operations['streak_api_v1_transactions_streak_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/transactions/{transaction_id}': {
     parameters: {
       query?: never
@@ -900,6 +944,43 @@ export interface components {
       amount_paise: number
       /** Category Id */
       category_id: number
+    }
+    /**
+     * StreakResponse
+     * @description How many days in a row something has been recorded, and whether today is one.
+     *
+     *     A run that ended yesterday is not over: the day is not finished yet.
+     */
+    StreakResponse: {
+      /** Days */
+      days: number
+      /** Today Recorded */
+      today_recorded: boolean
+    }
+    /**
+     * SuggestionResponse
+     * @description One name to offer for fast entry, and how it was recorded last.
+     *
+     *     `times_used` is how often the name has been recorded, and the rest is the
+     *     most recent time: one tap records the same thing again. `category_id` is null
+     *     for a movement that was split, because a split has no single category.
+     */
+    SuggestionResponse: {
+      /** Merchant */
+      merchant: string
+      /** Times Used */
+      times_used: number
+      /**
+       * Last Used
+       * Format: date
+       */
+      last_used: string
+      /** Account Id */
+      account_id: number
+      /** Category Id */
+      category_id: number | null
+      /** Amount Paise */
+      amount_paise: number
     }
     /**
      * TransactionResponse
@@ -1678,6 +1759,58 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  suggestions_api_v1_transactions_suggestions_get: {
+    parameters: {
+      query?: {
+        limit?: number
+        on?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SuggestionResponse'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  streak_api_v1_transactions_streak_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['StreakResponse']
         }
       }
     }
