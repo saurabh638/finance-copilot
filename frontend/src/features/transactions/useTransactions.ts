@@ -1,6 +1,6 @@
 /** Transaction data for the screen: the pages of the list, and recording. */
 
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { BALANCES_KEY } from '../accounts/useAccounts'
 import { SPEND_KEY } from '../categories/useCategories'
@@ -8,6 +8,8 @@ import {
   PAGE_SIZE,
   createTransaction,
   deleteTransaction,
+  fetchStreak,
+  fetchSuggestions,
   fetchTransactions,
   updateTransaction,
   type MovementCreate,
@@ -35,11 +37,31 @@ export function useTransactions(filter: MovementFilter) {
 }
 
 /**
+ * The names offered for fast entry, and the run of days.
+ *
+ * Both are read from history, so both are stale the moment a movement is added,
+ * corrected or removed: they are cached under their own keys and dropped with it.
+ */
+export const SUGGESTIONS_KEY = ['suggestions'] as const
+export const STREAK_KEY = ['streak'] as const
+
+/** The names worth offering, most used first. */
+export function useSuggestions() {
+  return useQuery({ queryKey: SUGGESTIONS_KEY, queryFn: () => fetchSuggestions() })
+}
+
+/** How many days in a row something has been recorded, and whether today is one. */
+export function useStreak() {
+  return useQuery({ queryKey: STREAK_KEY, queryFn: fetchStreak })
+}
+
+/**
  * Tell the screen that the movements changed.
  *
  * A balance is derived from postings, so it is stale the moment one is added,
  * corrected or removed: both caches are dropped together. The spending report is
- * derived from the same postings, so it goes with them.
+ * derived from the same postings, so it goes with them, and so do the suggestions
+ * and the streak, which are the history itself.
  */
 function useMovementsChanged(): () => void {
   const queryClient = useQueryClient()
@@ -48,6 +70,8 @@ function useMovementsChanged(): () => void {
     void queryClient.invalidateQueries({ queryKey: [KEY] })
     void queryClient.invalidateQueries({ queryKey: [BALANCES_KEY] })
     void queryClient.invalidateQueries({ queryKey: [SPEND_KEY] })
+    void queryClient.invalidateQueries({ queryKey: SUGGESTIONS_KEY })
+    void queryClient.invalidateQueries({ queryKey: STREAK_KEY })
   }
 }
 

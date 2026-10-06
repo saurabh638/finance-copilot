@@ -4,12 +4,14 @@ import AccountsPage from './features/accounts/AccountsPage'
 import LoginPage from './features/auth/LoginPage'
 import { useSession } from './features/auth/useSession'
 import CategoriesPage from './features/categories/CategoriesPage'
+import TodayPage from './features/today/TodayPage'
 import TransactionsPage from './features/transactions/TransactionsPage'
 
 /** The screens the signed-in app can show. */
-type Screen = 'transactions' | 'accounts' | 'categories'
+type Screen = 'today' | 'transactions' | 'accounts' | 'categories'
 
 const TABS: { id: Screen; label: string }[] = [
+  { id: 'today', label: 'Today' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'accounts', label: 'Accounts' },
   { id: 'categories', label: 'Categories' },
@@ -18,7 +20,7 @@ const TABS: { id: Screen; label: string }[] = [
 /** Show the login screen until there is a session, then the chosen screen. */
 export default function App() {
   const session = useSession()
-  const [screen, setScreen] = useState<Screen>('transactions')
+  const [screen, setScreen] = useState<Screen>('today')
 
   if (session.isPending) {
     return (
@@ -55,6 +57,7 @@ export default function App() {
         </ul>
       </nav>
 
+      {screen === 'today' && <TodayPage />}
       {screen === 'transactions' && <TransactionsPage />}
       {screen === 'accounts' && <AccountsPage />}
       {screen === 'categories' && <CategoriesPage />}

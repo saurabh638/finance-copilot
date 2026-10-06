@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { fetchAccounts } from './features/accounts/api'
 import { fetchCategories } from './features/categories/api'
-import { fetchTransactions } from './features/transactions/api'
+import { fetchStreak, fetchSuggestions, fetchTransactions } from './features/transactions/api'
 import { fetchSession, login, logout } from './lib/api'
 
 vi.mock('./lib/api')
@@ -34,6 +34,8 @@ describe('App', () => {
   beforeEach(() => {
     vi.mocked(fetchAccounts).mockResolvedValue([])
     vi.mocked(fetchCategories).mockResolvedValue([])
+    vi.mocked(fetchStreak).mockResolvedValue({ days: 0, today_recorded: false })
+    vi.mocked(fetchSuggestions).mockResolvedValue([])
     vi.mocked(fetchTransactions).mockResolvedValue([])
   })
 
@@ -49,13 +51,13 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'Log in' })).toBeInTheDocument()
   })
 
-  it('opens on the transactions screen when a session already exists', async () => {
+  it('opens on the todays screen when a session already exists', async () => {
     vi.mocked(fetchSession).mockResolvedValue(USER)
 
     renderApp()
 
     expect(await screen.findByText(`Signed in as ${USER.email}`)).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument()
   })
 
   it('moves between the screens from the tabs', async () => {
@@ -75,6 +77,11 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Transactions' }))
 
     expect(await screen.findByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Categories' }))
+
+    expect(await screen.findByRole('heading', { name: 'Categories' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Transactions' })).not.toBeInTheDocument()
   })
 
   it('signs in and reveals the accounts screen', async () => {
