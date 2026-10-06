@@ -2,11 +2,15 @@ import { type FormEvent, useState } from 'react'
 
 import Field, { INPUT_CLASS } from '../../components/Field'
 import TextField from '../../components/TextField'
+import CategoryPicker from '../categories/CategoryPicker'
+import { categoryLabel } from '../categories/tree'
+import type { Category } from '../categories/api'
 import type { Transaction, TransactionUpdate } from './api'
 import {
-  TRANSFER_AMOUNT_REASON,
-  canEditAmount,
+  amountReason,
   editValues,
+  filingKind,
+  filingReason,
   hasChanges,
   toUpdate,
   validateEdit,
@@ -16,6 +20,8 @@ import {
 
 interface TransactionEditorProps {
   transaction: Transaction
+  /** The category tree, so a filing can be changed where the API allows it. */
+  categories: Category[]
   onSave: (update: TransactionUpdate) => void
   isSaving: boolean
   errorMessage?: string | null
@@ -24,19 +30,28 @@ interface TransactionEditorProps {
 /**
  * The editor for a movement that already exists.
  *
- * The accounts and the kind are fixed, and so is the amount of a two-sided
- * movement: the API refuses to rewrite one side of a transfer, so the field is
- * shown, disabled, with the reason beside it.
+ * The accounts and the kind are fixed, and so is the amount of a movement with
+ * two postings: the API refuses to rewrite one side of a transfer, and a split's
+ * parts are the amount. The filing can be changed on a movement with one posting
+ * and is shown, with its reason, on one that has more.
  */
 export default function TransactionEditor({
   transaction,
+  categories,
   onSave,
   isSaving,
   errorMessage = null,
 }: TransactionEditorProps) {
   const [values, setValues] = useState<EditFormValues>(() => editValues(transaction))
   const [problems, setProblems] = useState<EditProblems>({})
-  const isAmountEditable = canEditAmount(transaction)
+  const fixedAmount = amountReason(transaction)
+  const kind = filingKind(transaction)
+  const fixedFiling = filingReason(transaction)
+
+  /** What a split is filed under, part by part; a transfer has nothing to list. */
+  const partLabels = transaction.postings
+    .map((posting) => categoryLabel(categories, posting.category_id))
+    .filter((label): label is string => label !== null)
 
   function change<K extends keyof EditFormValues>(field: K, value: EditFormValues[K]): void {
     setValues((current) => ({ ...current, [field]: value }))
@@ -63,7 +78,7 @@ export default function TransactionEditor({
         </p>
       )}
 
-      {isAmountEditable ? (
+      {fixedAmount === null ? (
         <TextField
           label="Amount"
           id="edit-amount"
@@ -82,7 +97,7 @@ export default function TransactionEditor({
             className={`${INPUT_CLASS} bg-slate-100 text-slate-600`}
           />
           <p id="edit-amount-reason" className="text-sm text-slate-600">
-            {TRANSFER_AMOUNT_REASON}
+            {fixedAmount}
           </p>
         </Field>
       )}
@@ -95,6 +110,26 @@ export default function TransactionEditor({
         error={problems.transaction_date}
         onChange={(value) => change('transaction_date', value)}
       />
+
+      {kind !== null ? (
+        <CategoryPicker
+          id="edit-category"
+          label="Category (optional)"
+          categories={categories}
+          kind={kind}
+          value={values.category_id}
+          onChange={(value) => change('category_id', value)}
+        />
+      ) : (
+        <Field label="Category" htmlFor="edit-category">
+          <p id="edit-category-reason" className="text-sm text-slate-600">
+            {fixedFiling}
+          </p>
+          {partLabels.length > 0 && (
+            <p className="text-sm text-slate-600">Filed under: {partLabels.join(', ')}</p>
+          )}
+        </Field>
+      )}
 
       <TextField
         label="Merchant (optional)"

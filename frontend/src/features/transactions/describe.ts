@@ -29,6 +29,28 @@ function nameOf(accountId: number, names: Map<number, string>): string {
   return names.get(accountId) ?? UNKNOWN_ACCOUNT
 }
 
+/**
+ * Which of the three shapes a movement's postings are.
+ *
+ * One posting is an external flow; postings that sum to zero are a movement
+ * between accounts; postings of a single sign are one external flow split
+ * between categories. The ledger holds the same three shapes, so the words here
+ * say what the ledger means: a split is spending or income, never a transfer.
+ */
+type MovementShape = 'single' | 'internal' | 'split'
+
+function shapeOf(transaction: Transaction): MovementShape {
+  if (transaction.postings.length === 1) {
+    return 'single'
+  }
+  return signedTotal(transaction) === 0 ? 'internal' : 'split'
+}
+
+/** The postings added up as they are signed: the whole a movement moved. */
+function signedTotal(transaction: Transaction): number {
+  return transaction.postings.reduce((total, posting) => total + posting.amount_paise, 0)
+}
+
 /** The paise this movement moved, always positive. */
 export function movementAmountPaise(transaction: Transaction): number {
   const [only] = transaction.postings
@@ -36,7 +58,12 @@ export function movementAmountPaise(transaction: Transaction): number {
     return Math.abs(only.amount_paise)
   }
 
-  // Two postings: the amount that arrived on the other side is the amount moved.
+  if (shapeOf(transaction) === 'split') {
+    // One flow counted once, however many names it was filed under.
+    return Math.abs(signedTotal(transaction))
+  }
+
+  // A movement between accounts: what arrived on the other side is what moved.
   return transaction.postings.reduce(
     (total, posting) => total + Math.max(0, posting.amount_paise),
     0,
@@ -50,6 +77,10 @@ export function movementLabel(transaction: Transaction): string {
     return POSTING_KIND_LABELS[only.kind]
   }
 
+  if (shapeOf(transaction) === 'split' && only !== undefined) {
+    return POSTING_KIND_LABELS[only.kind]
+  }
+
   return POSTING_KIND_LABELS.transfer
 }
 
@@ -58,6 +89,12 @@ export function movementParties(transaction: Transaction, names: Map<number, str
   const [only] = transaction.postings
   if (transaction.postings.length === 1 && only !== undefined) {
     return nameOf(only.account_id, names)
+  }
+
+  if (shapeOf(transaction) === 'split') {
+    // A split leaves one account, so its name is said once and not twice.
+    const accounts = [...new Set(transaction.postings.map((posting) => posting.account_id))]
+    return accounts.map((accountId) => nameOf(accountId, names)).join(' → ')
   }
 
   const out = transaction.postings
@@ -74,12 +111,17 @@ export function movementParties(transaction: Transaction, names: Map<number, str
  * The amount as text.
  *
  * A single posting keeps its sign, so spending can never be mistaken for income.
- * A transfer is neither, so it shows the amount moved and no sign at all.
+ * A split is spending or income too, so it keeps the sign of its parts. A
+ * transfer is neither, so it shows the amount moved and no sign at all.
  */
 export function movementAmountText(transaction: Transaction): string {
   const [only] = transaction.postings
   if (transaction.postings.length === 1 && only !== undefined) {
     return formatPaise(only.amount_paise)
+  }
+
+  if (shapeOf(transaction) === 'split') {
+    return formatPaise(signedTotal(transaction))
   }
 
   return formatPaise(movementAmountPaise(transaction))

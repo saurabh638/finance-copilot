@@ -4,7 +4,9 @@
  */
 
 import { InvalidMoneyError, formatPaise, parsePaise } from '../../lib/money'
-import type { Transaction, TransactionUpdate } from './api'
+import type { CategoryKind } from '../categories/api'
+import type { PostingKind, Transaction, TransactionUpdate } from './api'
+import { movementAmountPaise } from './describe'
 
 /** What the editor holds while it is open. */
 export interface EditFormValues {
@@ -12,6 +14,8 @@ export interface EditFormValues {
   amount: string
   merchant: string
   note: string
+  /** The category as text, or empty text for none. */
+  category_id: string
 }
 
 export type EditProblems = Partial<Record<keyof EditFormValues, string>>
@@ -23,6 +27,29 @@ const NOTE_MAX = 500
 export const TRANSFER_AMOUNT_REASON =
   'A transfer is two sides that have to keep adding to zero, so its amount cannot be edited here.'
 
+/** Why a split's amount is fixed: it is the total its parts must add up to. */
+export const SPLIT_AMOUNT_REASON =
+  'This movement is split between categories, so its parts are the amount; to change it, remove the movement and record it again.'
+
+/** Why a transfer has no filing to change. */
+export const TRANSFER_FILING_REASON =
+  'A transfer moves money without spending it, so it is filed under nothing.'
+
+/** Why a split's filing cannot be changed here: each part has its own. */
+export const SPLIT_FILING_REASON =
+  'This movement is split between categories, so its parts are the filing; to change them, remove the movement and record it again.'
+
+/** The kind of name each posting may be filed under, as the server accepts them. */
+const FILING_KINDS: Partial<Record<PostingKind, CategoryKind>> = {
+  expense: 'expense',
+  income: 'income',
+  adjustment: 'adjustment',
+}
+
+/** Why the filing of a split cannot be changed here. */
+export const FILING_REASON =
+  'This movement is split between categories, so its parts are the filing; a part is changed by removing the movement and recording it again.'
+
 /**
  * True when the movement has a single posting, and so a single amount that can
  * be rewritten. The API refuses an amount change on anything else.
@@ -31,25 +58,69 @@ export function canEditAmount(transaction: Transaction): boolean {
   return transaction.postings.length === 1
 }
 
-/** The amount the movement moved, as text, however many postings it has. */
-function amountText(transaction: Transaction): string {
-  const [only] = transaction.postings
-  if (transaction.postings.length === 1 && only !== undefined) {
-    return formatPaise(Math.abs(only.amount_paise))
-  }
+/**
+ * True when the movement's filing can be changed here.
+ *
+ * A split files each of its postings under its own category, so there is no one
+ * answer to change: the API refuses it for the same reason.
+ */
+export function canEditFiling(transaction: Transaction): boolean {
+  return transaction.postings.length === 1
+}
 
-  return formatPaise(
-    transaction.postings.reduce((total, posting) => total + Math.max(0, posting.amount_paise), 0),
-  )
+/**
+ * The kind of name this movement may be filed under, or null when it has no one
+ * filing to change: a split files each posting itself, and a transfer files none.
+ */
+export function filingKind(transaction: Transaction): CategoryKind | null {
+  const [only] = transaction.postings
+  if (only === undefined || !canEditFiling(transaction)) {
+    return null
+  }
+  return FILING_KINDS[only.kind] ?? null
+}
+
+/** Why the amount cannot be rewritten here, or null when it can be. */
+export function amountReason(transaction: Transaction): string | null {
+  if (canEditAmount(transaction)) {
+    return null
+  }
+  const [first] = transaction.postings
+  return first?.kind === 'transfer' ? TRANSFER_AMOUNT_REASON : SPLIT_AMOUNT_REASON
+}
+
+/** Why the filing cannot be changed here, or null when it can be. */
+export function filingReason(transaction: Transaction): string | null {
+  if (canEditFiling(transaction)) {
+    return null
+  }
+  const [first] = transaction.postings
+  return first?.kind === 'transfer' ? TRANSFER_FILING_REASON : SPLIT_FILING_REASON
+}
+
+/**
+ * The amount the movement moved, as text, however many postings it has.
+ *
+ * The arithmetic lives in `describe.ts`, where the list row reads the same
+ * figure: one implementation, so a split can never read as ₹0.00 in one place
+ * and as its whole in the other. The editor shows it unsigned, because the
+ * field takes a positive figure and the direction is not edited here.
+ */
+function amountText(transaction: Transaction): string {
+  return formatPaise(movementAmountPaise(transaction))
 }
 
 /** The form as it opens for a movement that already exists. */
 export function editValues(transaction: Transaction): EditFormValues {
+  const [only] = transaction.postings
+  const filing = canEditFiling(transaction) && only !== undefined ? only.category_id : null
+
   return {
     transaction_date: transaction.transaction_date,
     amount: amountText(transaction),
     merchant: transaction.merchant ?? '',
     note: transaction.note ?? '',
+    category_id: filing === null ? '' : String(filing),
   }
 }
 
@@ -127,6 +198,16 @@ export function toUpdate(values: EditFormValues, original: Transaction): Transac
     const paise = positivePaise(values.amount)
     if (only !== undefined && paise !== Math.abs(only.amount_paise)) {
       update.amount_paise = paise
+    }
+  }
+
+  // Clearing the filing is said with an explicit null: the API leaves an omitted
+  // field alone, so nothing else could tell it to forget the old category.
+  if (canEditFiling(original)) {
+    const [only] = original.postings
+    const chosen = values.category_id === '' ? null : Number(values.category_id)
+    if (only !== undefined && chosen !== only.category_id) {
+      update.category_id = chosen
     }
   }
 
