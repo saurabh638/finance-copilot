@@ -25,7 +25,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M10a The category tree | done | `Category` model, migration 0008 (the table and `postings.category_id`), the seeded Indian-household set, tree CRUD with its rules, and `seed-categories`. Approved. |
 | M10b Categories in use | done | A movement carries a category; a write-off takes `Unaccounted for spending` or `Unrecorded income` by its sign; a movement can be split between categories; spend by category. Approved. |
 | M10c The picker on the entry forms | done | The category tree offered as a flat `Branch · Child` picker on the recording form, splits between categories with the parts having to add up exactly, and the filing shown and changed on the edit screen. Approved. |
-| M10d The categories page and the spend view | not started | A third tab: the tree editable in place, and the month's spending read by branch. |
+| M10d The categories page and the spend view | done | A third tab: the tree editable in place — add, rename, move, remove, with the server's own refusals — and the period's spending by branch, with the money in no category reported beside it. M10 is complete. Approved. |
 | M11 Daily check-in screen | not started | |
 | M12 Recurring and scheduled items | not started | |
 | M13 Interest accrual engine | not started | |
@@ -40,10 +40,10 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M10c is done**: a movement can be filed from the app — a flat picker of `Branch · Child`, a split
-between several categories whose parts must add up to the amount exactly, and the filing shown and
-changed on the edit screen. **M10d is next** — the categories page and the spend-by-category view, after
-which M10 is complete and the two-week Phase 0 gate can begin.
+**M10 is complete**: money is filed under names the user owns, and the app answers both sides of the
+question — a movement says what it was filed under, and the categories screen shows what each branch cost
+in a period and how much of the spending has no name on it at all. **The two-week Phase 0 gate is next**,
+which needs the twelve figures only the user can give (`seed`), and real use from there.
 
 Before the app holds real data:
 
@@ -64,6 +64,11 @@ Before the app holds real data:
   income* and *Unaccounted for spending*. Its balance stands at the stated figure of its last check
   (₹99,000). Nothing real, and useful for looking at M10c's screens.
 - Take a backup before any risky change: `./scripts/backup.sh`.
+- The M10d walkthrough edited the tree and put it back: *Groceries* was renamed to *Fruit & veg* (which the
+  movements list immediately said it was filed under), moved under *Home*, then moved back and renamed
+  again, so the tree stands as the default set plus *Filter coffee*. The month it showed was
+  ₹4,050.00: ₹1,300.00 under *Food & groceries* (Eating out ₹700.00, Groceries ₹600.00) and ₹2,750.00
+  filed under nothing.
 - The M10c walkthrough added two movements to the *Walkthrough* account on 6 October 2026: ₹250 with no
   category (it was filed under *Groceries*, then refiled to *Eating out*, then cleared, which is the
   clearing path) and a ₹500 shop split between *Groceries* and *Eating out*. Useful for looking at
@@ -112,6 +117,16 @@ Before the app holds real data:
 - The picker is one flat list of `Branch · Child` names, which is fine on a desktop and long on a phone
   (43 names today). Kept as it is deliberately; M11's phone screen is where a two-step branch-then-name
   picker should be judged, with a thumb rather than a mouse.
+- A write-off now carries no note, so its row is titled *No description* with *Filed under Unaccounted for
+  spending* underneath; write-offs recorded before this change keep their note and say the wording twice.
+  **Decided**: the wording belongs in the filing alone. If *No description* reads poorly in daily use, the
+  one-line fix is to let the filing title the row and drop the line beneath it.
+- The confirmation before a removal counts the names a category holds but cannot say how much money is
+  filed under it: the tree a screen has carries no figures. The server's refusal names it either way.
+- The spend view is one period at a time: no comparison with last month, and no drill-in from a branch to
+  the movements behind it. **Decided**: that belongs with M11's daily screen rather than here.
+- A group can be created as spending or earning only. An `adjustment` name can be made through the API but
+  nothing would offer it, so the form does not offer it either.
 - The spend report reads every matching posting and adds the figures up in Python, which is what keeps
   money out of the database's arithmetic. One household's month is a few hundred rows; a decade of import
   would want a grouped query, and that is a decision to make then, not now.
