@@ -3,6 +3,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { BALANCES_KEY } from '../accounts/useAccounts'
+import { SPEND_KEY } from '../categories/useCategories'
 import {
   PAGE_SIZE,
   createTransaction,
@@ -37,7 +38,8 @@ export function useTransactions(filter: MovementFilter) {
  * Tell the screen that the movements changed.
  *
  * A balance is derived from postings, so it is stale the moment one is added,
- * corrected or removed: both caches are dropped together.
+ * corrected or removed: both caches are dropped together. The spending report is
+ * derived from the same postings, so it goes with them.
  */
 function useMovementsChanged(): () => void {
   const queryClient = useQueryClient()
@@ -45,6 +47,7 @@ function useMovementsChanged(): () => void {
   return () => {
     void queryClient.invalidateQueries({ queryKey: [KEY] })
     void queryClient.invalidateQueries({ queryKey: [BALANCES_KEY] })
+    void queryClient.invalidateQueries({ queryKey: [SPEND_KEY] })
   }
 }
 

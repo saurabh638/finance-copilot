@@ -381,11 +381,13 @@ export interface paths {
     }
     /**
      * Spend
-     * @description What was spent under each expense category in a period, children rolled in.
+     * @description What was spent in a period: every expense category, and the money in none.
      *
      *     `from` and `to` are inclusive dates on the transaction, and either may be
      *     left out. A category with nothing spent is a row of zeros rather than a
-     *     missing row, so the tree the client draws is the whole tree.
+     *     missing row, so the tree the client draws is the whole tree; spending filed
+     *     under no category has no row at all, so it comes back beside them and is
+     *     counted in the period's `total_paise`.
      */
     get: operations['spend_api_v1_categories_spend_get']
     put?: never
@@ -872,6 +874,23 @@ export interface components {
      * @enum {string}
      */
     RateFrequency: 'daily' | 'monthly' | 'quarterly' | 'yearly'
+    /**
+     * SpendReportResponse
+     * @description A period's spending: the tree, the money in no category, and the whole.
+     *
+     *     Spending filed under no category has no row to appear in, so it is reported
+     *     beside the rows rather than left out: otherwise the rows would not add up to
+     *     what the period actually cost. `total_paise` is the two together, so a client
+     *     never has to decide what counts as spending.
+     */
+    SpendReportResponse: {
+      /** Rows */
+      rows: components['schemas']['CategorySpendResponse'][]
+      /** Uncategorised Paise */
+      uncategorised_paise: number
+      /** Total Paise */
+      total_paise: number
+    }
     /**
      * SplitPartCreate
      * @description One part of a movement the user split between categories.
@@ -1956,7 +1975,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['CategorySpendResponse'][]
+          'application/json': components['schemas']['SpendReportResponse']
         }
       }
       /** @description Validation Error */
