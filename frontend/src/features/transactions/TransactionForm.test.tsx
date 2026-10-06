@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Account } from '../accounts/api'
+import type { Category } from '../categories/api'
 import type { MovementCreate } from './api'
 import TransactionForm from './TransactionForm'
 
@@ -23,6 +24,13 @@ const SBI: Account = {
 
 const CENTRAL: Account = { ...SBI, id: 2, name: 'Central Bank' }
 
+/** The tree the form is given: one branch with a name under it, and one income. */
+const CATEGORIES: Category[] = [
+  { id: 10, name: 'Food & groceries', kind: 'expense', parent_id: null },
+  { id: 11, name: 'Groceries', kind: 'expense', parent_id: 10 },
+  { id: 12, name: 'Salary', kind: 'income', parent_id: null },
+]
+
 interface RenderOptions {
   onSubmit?: (payload: MovementCreate) => void
   isSaving?: boolean
@@ -37,6 +45,7 @@ function renderForm({
   render(
     <TransactionForm
       accounts={[SBI, CENTRAL]}
+      categories={CATEGORIES}
       today="2026-10-04"
       onSubmit={onSubmit}
       isSaving={isSaving}
@@ -92,6 +101,137 @@ describe('TransactionForm', () => {
     expect(screen.getByLabelText('To account')).toBeInTheDocument()
     expect(screen.queryByLabelText('Account')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Merchant (optional)')).not.toBeInTheDocument()
+  })
+
+  it('offers the category tree for money spent, a branch and the name under it', () => {
+    renderForm()
+
+    const options = Array.from(
+      screen.getByLabelText('Category (optional)').querySelectorAll('option'),
+    )
+
+    expect(options.map((option) => option.textContent)).toEqual([
+      'No category',
+      'Food & groceries',
+      'Food & groceries · Groceries',
+    ])
+  })
+
+  it('files the movement under the category chosen', () => {
+    const onSubmit = renderForm()
+    type('Amount', '500')
+    type('Account', '1')
+    type('Category (optional)', '11')
+
+    submit()
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      kind: 'expense',
+      account_id: 1,
+      amount_paise: 50000,
+      transaction_date: '2026-10-04',
+      category_id: 11,
+      merchant: null,
+      note: null,
+    })
+  })
+
+  it('records a movement with no category when none was chosen', () => {
+    const onSubmit = vi.fn<(payload: MovementCreate) => void>()
+    renderForm({ onSubmit })
+    type('Amount', '500')
+    type('Account', '1')
+
+    submit()
+
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('category_id')
+  })
+
+  it('offers no category for a transfer', () => {
+    renderForm()
+
+    type('Direction', 'transfer')
+
+    expect(screen.queryByLabelText('Category (optional)')).not.toBeInTheDocument()
+  })
+
+  it('offers no split for a transfer', () => {
+    renderForm()
+
+    type('Direction', 'transfer')
+
+    expect(
+      screen.queryByLabelText('Split this amount between several categories'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('swaps the single category for the parts when the split mode is turned on', () => {
+    renderForm()
+
+    expect(screen.getByLabelText('Category (optional)')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Split this amount between several categories'))
+
+    expect(screen.queryByLabelText('Category (optional)')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Part 1 amount')).toBeInTheDocument()
+    expect(screen.getByLabelText('Part 2 category')).toBeInTheDocument()
+  })
+
+  it('records one amount split between the categories it was filed under', () => {
+    const onSubmit = vi.fn<(payload: MovementCreate) => void>()
+    renderForm({ onSubmit })
+    type('Amount', '500')
+    type('Account', '1')
+    fireEvent.click(screen.getByLabelText('Split this amount between several categories'))
+    type('Part 1 amount', '300')
+    type('Part 1 category', '11')
+    type('Part 2 amount', '200')
+    type('Part 2 category', '10')
+
+    submit()
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      kind: 'expense',
+      account_id: 1,
+      amount_paise: 50000,
+      transaction_date: '2026-10-04',
+      merchant: null,
+      note: null,
+      parts: [
+        { amount_paise: 30000, category_id: 11 },
+        { amount_paise: 20000, category_id: 10 },
+      ],
+    })
+  })
+
+  it('refuses a split whose parts do not add up, and sends nothing', () => {
+    const onSubmit = vi.fn<(payload: MovementCreate) => void>()
+    renderForm({ onSubmit })
+    type('Amount', '500')
+    type('Account', '1')
+    fireEvent.click(screen.getByLabelText('Split this amount between several categories'))
+    type('Part 1 amount', '300')
+    type('Part 1 category', '11')
+    type('Part 2 amount', '100')
+    type('Part 2 category', '10')
+
+    submit()
+
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The parts must add up to ₹500.00; ₹100.00 is still to allocate',
+    )
+  })
+
+  it('offers earning names once the direction is money received', () => {
+    renderForm()
+
+    type('Direction', 'income')
+    const options = Array.from(
+      screen.getByLabelText('Category (optional)').querySelectorAll('option'),
+    )
+
+    expect(options.map((option) => option.textContent)).toEqual(['No category', 'Salary'])
   })
 
   it('sends a transfer as two accounts', () => {

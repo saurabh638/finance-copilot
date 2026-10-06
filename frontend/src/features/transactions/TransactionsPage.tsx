@@ -3,6 +3,7 @@ import { useState } from 'react'
 import PageHeader from '../../components/PageHeader'
 import { todayIso } from '../../lib/dates'
 import { useAccounts } from '../accounts/useAccounts'
+import { useCategories } from '../categories/useCategories'
 import TransactionEditor from './TransactionEditor'
 import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
@@ -27,6 +28,7 @@ interface TransactionsPageProps {
  */
 export default function TransactionsPage({ today = todayIso() }: TransactionsPageProps) {
   const accounts = useAccounts()
+  const categories = useCategories()
   const [filter, setFilter] = useState<MovementFilter>(NO_FILTER)
   const [isRecording, setIsRecording] = useState(false)
   // Bumping the key remounts the form, which is how a saved one is cleared.
@@ -42,6 +44,7 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
 
   const list = accounts.data ?? []
   const names = new Map(list.map((account) => [account.id, account.name]))
+  const tree = categories.data ?? []
   const shown = movements.data?.pages.flat() ?? []
   const isFiltered = filter.accountId !== null || filter.from !== '' || filter.to !== ''
 
@@ -100,6 +103,7 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
         <TransactionForm
           key={formKey}
           accounts={list}
+          categories={tree}
           today={today}
           onSubmit={handleSubmit}
           isSaving={recordMovement.isPending}
@@ -145,6 +149,7 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
                 {editingId === transaction.id && (
                   <TransactionEditor
                     transaction={transaction}
+                    categories={tree}
                     onSave={(update) => handleSave(transaction.id, update)}
                     isSaving={updateMovement.isPending}
                     errorMessage={editError}

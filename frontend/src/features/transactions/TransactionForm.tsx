@@ -3,7 +3,11 @@ import { type FormEvent, useState } from 'react'
 import SelectField from '../../components/SelectField'
 import TextField from '../../components/TextField'
 import type { Account } from '../accounts/api'
+import CategoryPicker from '../categories/CategoryPicker'
+import type { Category, CategoryKind } from '../categories/api'
 import type { MovementCreate } from './api'
+import { remainingPaise } from './parts'
+import SplitEditor from './SplitEditor'
 import {
   KINDS,
   KIND_LABELS,
@@ -18,6 +22,8 @@ import {
 interface TransactionFormProps {
   /** The accounts money can move between. */
   accounts: Account[]
+  /** The category tree, so a movement can be filed as it is recorded. */
+  categories: Category[]
   /** Today, given by the caller, so the form never reads the clock itself. */
   today: string
   onSubmit: (payload: MovementCreate) => void
@@ -28,6 +34,7 @@ interface TransactionFormProps {
 /** The recording form. The rules live in form.ts; this renders and submits. */
 export default function TransactionForm({
   accounts,
+  categories,
   today,
   onSubmit,
   isSaving,
@@ -59,6 +66,9 @@ export default function TransactionForm({
   }
 
   const isTransfer = values.kind === 'transfer'
+  // A transfer moves money without spending or earning it, so it is offered no
+  // filing at all rather than an empty one.
+  const filingKind: CategoryKind | null = values.kind === 'transfer' ? null : values.kind
 
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-4 grid gap-4 sm:max-w-md">
@@ -127,6 +137,41 @@ export default function TransactionForm({
           labels={accountLabels}
           error={problems.account_id}
           onChange={(value) => change('account_id', value)}
+        />
+      )}
+
+      {filingKind !== null && (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            id="movement-split"
+            type="checkbox"
+            checked={values.split}
+            onChange={(event) => change('split', event.target.checked)}
+            className="h-5 w-5"
+          />
+          Split this amount between several categories
+        </label>
+      )}
+
+      {filingKind !== null && !values.split && (
+        <CategoryPicker
+          id="movement-category"
+          label="Category (optional)"
+          categories={categories}
+          kind={filingKind}
+          value={values.category_id}
+          onChange={(value) => change('category_id', value)}
+        />
+      )}
+
+      {filingKind !== null && values.split && (
+        <SplitEditor
+          parts={values.parts}
+          categories={categories}
+          kind={filingKind}
+          remainingPaise={remainingPaise(values.amount, values.parts)}
+          error={problems.parts}
+          onChange={(parts) => change('parts', parts)}
         />
       )}
 

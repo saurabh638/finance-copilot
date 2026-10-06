@@ -27,6 +27,12 @@ describe('blankMovement', () => {
       account_id: '',
       from_account_id: '',
       to_account_id: '',
+      category_id: '',
+      split: false,
+      parts: [
+        { amount: '', category_id: '' },
+        { amount: '', category_id: '' },
+      ],
       merchant: '',
       note: '',
     })
@@ -83,6 +89,56 @@ describe('validateMovement', () => {
     )
   })
 
+  it('refuses a split whose parts do not add up to the amount', () => {
+    expect(
+      validateMovement(
+        expense({
+          amount: '500',
+          split: true,
+          parts: [
+            { amount: '300', category_id: '11' },
+            { amount: '100', category_id: '12' },
+          ],
+        }),
+      ).parts,
+    ).toBe('The parts must add up to ₹500.00; ₹100.00 is still to allocate')
+  })
+
+  it('refuses a split with a part that has no category', () => {
+    expect(
+      validateMovement(
+        expense({
+          amount: '500',
+          split: true,
+          parts: [
+            { amount: '300', category_id: '11' },
+            { amount: '200', category_id: '' },
+          ],
+        }),
+      ).parts,
+    ).toBe('Every part needs a category')
+  })
+
+  it('says nothing about the parts when the split mode is off', () => {
+    expect(validateMovement(expense({ amount: '500' })).parts).toBeUndefined()
+  })
+
+  it('says nothing about the parts until the amount itself is money', () => {
+    const problems = validateMovement(
+      expense({
+        amount: 'abc',
+        split: true,
+        parts: [
+          { amount: '300', category_id: '11' },
+          { amount: '200', category_id: '12' },
+        ],
+      }),
+    )
+
+    expect(problems.parts).toBeUndefined()
+    expect(problems.amount).toBeDefined()
+  })
+
   it('keeps the merchant and the note inside the column sizes', () => {
     expect(validateMovement(expense({ merchant: 'x'.repeat(121) })).merchant).toBeDefined()
     expect(validateMovement(expense({ note: 'x'.repeat(501) })).note).toBeDefined()
@@ -110,6 +166,68 @@ describe('toPayload', () => {
       account_id: 1,
       amount_paise: 2000000,
     })
+  })
+
+  it('files money spent under the category chosen', () => {
+    expect(toPayload(expense({ category_id: '7' }))).toMatchObject({
+      kind: 'expense',
+      category_id: 7,
+    })
+  })
+
+  it('files money received under an earning category', () => {
+    expect(toPayload(expense({ kind: 'income', category_id: '4' }))).toMatchObject({
+      kind: 'income',
+      category_id: 4,
+    })
+  })
+
+  it('leaves the filing out when no category is chosen, rather than sending null', () => {
+    expect(toPayload(expense())).not.toHaveProperty('category_id')
+  })
+
+  it('never files a transfer under a category, whatever the form was left holding', () => {
+    const payload = toPayload(transfer({ category_id: '7' }))
+
+    expect(payload.kind).toBe('transfer')
+    expect(payload).not.toHaveProperty('category_id')
+  })
+
+  it('sends a split as the parts and the whole amount, with no single category', () => {
+    const payload = toPayload(
+      expense({
+        amount: '500',
+        category_id: '7',
+        split: true,
+        parts: [
+          { amount: '300', category_id: '11' },
+          { amount: '200', category_id: '12' },
+        ],
+      }),
+    )
+
+    expect(payload).toMatchObject({
+      kind: 'expense',
+      amount_paise: 50000,
+      parts: [
+        { amount_paise: 30000, category_id: 11 },
+        { amount_paise: 20000, category_id: 12 },
+      ],
+    })
+    expect(payload).not.toHaveProperty('category_id')
+  })
+
+  it('leaves a split’s parts behind when the split mode is off', () => {
+    const payload = toPayload(
+      expense({
+        category_id: '7',
+        split: false,
+        parts: [{ amount: '500', category_id: '11' }],
+      }),
+    )
+
+    expect(payload).toMatchObject({ category_id: 7 })
+    expect(payload).not.toHaveProperty('parts')
   })
 
   it('sends a blank merchant and note as null, not as empty text', () => {

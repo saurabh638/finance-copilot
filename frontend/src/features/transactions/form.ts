@@ -2,6 +2,7 @@
 
 import { InvalidMoneyError, parsePaise } from '../../lib/money'
 import type { MovementCreate } from './api'
+import { blankParts, partsPayload, validateParts, type MovementPart } from './parts'
 
 /** The three things a person records by hand. Everything else arrives later. */
 export type MovementKind = 'expense' | 'income' | 'transfer'
@@ -28,6 +29,17 @@ export interface MovementFormValues {
   account_id: string
   from_account_id: string
   to_account_id: string
+  /** The chosen category as text, or empty text for none. */
+  category_id: string
+  /**
+   * Whether the amount is split between several categories.
+   *
+   * Both the parts and the single category stay in the form while it is toggled,
+   * so nothing typed is thrown away by a change of mind; the payload takes
+   * whichever of the two this flag says was meant.
+   */
+  split: boolean
+  parts: MovementPart[]
   merchant: string
   note: string
 }
@@ -41,6 +53,9 @@ export function blankMovement(today: string): MovementFormValues {
     account_id: '',
     from_account_id: '',
     to_account_id: '',
+    category_id: '',
+    split: false,
+    parts: blankParts(),
     merchant: '',
     note: '',
   }
@@ -96,6 +111,16 @@ export function validateMovement(values: MovementFormValues): MovementProblems {
     problems.account_id = 'Pick an account'
   }
 
+  // A split is a reading of the amount, so it is checked against the amount and
+  // only for the two kinds that can be filed. A transfer is one movement between
+  // two accounts and is never split.
+  if (values.kind !== 'transfer' && values.split) {
+    const trouble = validateParts(values.amount, values.parts)
+    if (trouble !== null) {
+      problems.parts = trouble
+    }
+  }
+
   if (values.merchant.trim().length > MERCHANT_MAX) {
     problems.merchant = `Keep the merchant under ${MERCHANT_MAX} characters`
   }
@@ -112,6 +137,17 @@ function orNull(text: string): string | null {
   return trimmed === '' ? null : trimmed
 }
 
+/**
+ * The filing, or nothing at all.
+ *
+ * A movement may be filed under a category and may just as well not be, so a
+ * form with nothing chosen sends no `category_id` rather than a null the server
+ * would have to read as the same thing. A transfer has no filing to send: it
+ * moves money without spending it.
+ */
+function filing(category_id: string): { category_id?: number } {
+  return category_id === '' ? {} : { category_id: Number(category_id) }
+}
 /**
  * The payload for the API.
  *
@@ -141,6 +177,7 @@ export function toPayload(values: MovementFormValues): MovementCreate {
     kind: values.kind,
     account_id: Number(values.account_id),
     merchant: orNull(values.merchant),
+    ...(values.split ? { parts: partsPayload(values.parts) } : filing(values.category_id)),
     ...shared,
   }
 }
