@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.core.ledger import (
@@ -20,6 +20,7 @@ from app.core.ledger import (
     sum_paise,
     transfer_amounts,
 )
+from app.core.suggestions import Suggestion, rank_suggestions, streak_days
 from app.models import Account, CategoryKind, Posting, PostingKind, Transaction, TransactionSource
 from app.schemas.transaction import SplitPartCreate, TransactionUpdate
 from app.services.accounts import get_account
@@ -38,6 +39,12 @@ class TransactionNotFoundError(LookupError):
 
 class InvalidTransactionError(ValueError):
     """Raised when a movement would break a rule that needs the database."""
+
+
+# How far back a name has to have been used to be worth offering again. Three
+# months is long enough to hold a monthly habit and short enough that a name the
+# user has dropped stops taking up room in the row.
+SUGGESTION_DAYS = 90
 
 
 @dataclass(frozen=True)
@@ -428,6 +435,114 @@ class TransactionDetail:
 
     transaction: Transaction
     postings: list[Posting]
+
+
+def merchant_suggestions(
+    db: DbSession,
+    user_id: int,
+    *,
+    on: date,
+    within_days: int = SUGGESTION_DAYS,
+    limit: int = 8,
+) -> list[Suggestion]:
+    """The names worth offering for fast entry, most used first.
+
+    History is the merchants the user has recorded: income as well as spending,
+    because a name is a name. A write-off has no merchant and a transfer has
+    none, so neither is history. What a suggestion remembers is how the name was
+    recorded *last*, and a split remembers no single category, because it has
+    several: offering one of them would be a guess dressed as a memory.
+    """
+    rows = db.execute(_live_merchant_history(user_id)).all()
+
+    seen: dict[str, Suggestion] = {}
+    for merchant, times_used, last_used, account_id, category_id, amount_paise, postings in rows:
+        # The rows arrive newest first, so the first sight of a name is its most
+        # recent use, and later rows for the same name are older: keep the first.
+        if merchant in seen:
+            continue
+        seen[merchant] = Suggestion(
+            merchant=merchant,
+            times_used=times_used,
+            last_used=last_used,
+            account_id=account_id,
+            category_id=category_id if postings == 1 else None,
+            amount_paise=abs(amount_paise),
+        )
+
+    return rank_suggestions(list(seen.values()), within_days, on)[:limit]
+
+
+def _live_merchant_history(user_id: int) -> Select[str, int, date, int, int | None, int, int]:
+    """One row per live movement that names a merchant, newest first.
+
+    The count is per name across the whole history, and the rest of the row is
+    that movement's own: which account, which category (if it has one), how much,
+    and how many postings it has.
+    """
+    counted = (
+        select(Transaction.merchant, func.count(Posting.id).label("times_used"))
+        .join(Posting, Posting.transaction_id == Transaction.id)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.deleted_at.is_(None),
+            Posting.deleted_at.is_(None),
+            Transaction.merchant.is_not(None),
+            Posting.kind.in_([PostingKind.EXPENSE, PostingKind.INCOME]),
+        )
+        .group_by(Transaction.merchant)
+        .subquery()
+    )
+
+    postings = (
+        select(
+            Posting.transaction_id,
+            func.count(Posting.id).label("postings"),
+            func.min(Posting.account_id).label("account_id"),
+            func.max(Posting.category_id).label("category_id"),
+            func.sum(Posting.amount_paise).label("amount_paise"),
+        )
+        .where(Posting.deleted_at.is_(None))
+        .group_by(Posting.transaction_id)
+        .subquery()
+    )
+
+    return (
+        select(
+            Transaction.merchant,
+            counted.c.times_used,
+            Transaction.transaction_date,
+            postings.c.account_id,
+            postings.c.category_id,
+            postings.c.amount_paise,
+            postings.c.postings,
+        )
+        .join(counted, counted.c.merchant == Transaction.merchant)
+        .join(postings, postings.c.transaction_id == Transaction.id)
+        .where(Transaction.user_id == user_id, Transaction.deleted_at.is_(None))
+        .order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+    )
+
+
+def streak(db: DbSession, user_id: int, today: date) -> tuple[int, bool]:
+    """How many days in a row the user has recorded something, and whether today is one."""
+    days = [row[0] for row in db.execute(_recorded_days(user_id)).all()]
+    return streak_days(days, today), today in set(days)
+
+
+def _recorded_days(user_id: int) -> Select[date]:
+    """The days on which a live movement was recorded, newest first."""
+    return (
+        select(Transaction.transaction_date)
+        .join(Posting, Posting.transaction_id == Transaction.id)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.deleted_at.is_(None),
+            Posting.deleted_at.is_(None),
+        )
+        .group_by(Transaction.transaction_date)
+        .order_by(Transaction.transaction_date.desc())
+    )
 
 
 def transaction_detail(db: DbSession, user_id: int, transaction_id: int) -> TransactionDetail:

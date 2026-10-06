@@ -116,3 +116,31 @@ class TransactionResponse(BaseModel):
     note: str | None
     source: TransactionSource
     postings: list[PostingResponse]
+
+
+class SuggestionResponse(BaseModel):
+    """One name to offer for fast entry, and how it was recorded last.
+
+    `times_used` is how often the name has been recorded, and the rest is the
+    most recent time: one tap records the same thing again. `category_id` is null
+    for a movement that was split, because a split has no single category.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    merchant: str
+    times_used: int
+    last_used: date
+    account_id: int
+    category_id: int | None
+    amount_paise: int
+
+
+class StreakResponse(BaseModel):
+    """How many days in a row something has been recorded, and whether today is one.
+
+    A run that ended yesterday is not over: the day is not finished yet.
+    """
+
+    days: int
+    today_recorded: bool

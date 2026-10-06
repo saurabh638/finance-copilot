@@ -16,6 +16,8 @@ from app.schemas.transaction import (
     IncomeCreate,
     MovementCreate,
     PostingResponse,
+    StreakResponse,
+    SuggestionResponse,
     TransactionResponse,
     TransactionUpdate,
     TransferCreate,
@@ -155,6 +157,34 @@ def index(
         offset=offset,
     )
     return [_response(detail) for detail in found]
+
+
+@router.get("/suggestions", response_model=list[SuggestionResponse])
+def suggestions(
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+    limit: int = Query(default=8, ge=1, le=50),
+    on: date | None = None,
+) -> list[SuggestionResponse]:
+    """The names worth offering for fast entry, most used first.
+
+    Each one carries how it was recorded last, so one tap records it again. `on`
+    is the day to count the window back from, and defaults to today; a client
+    sends it only when it is showing a day of its own.
+    """
+    found = transactions.merchant_suggestions(db, user.id, on=on or date.today(), limit=limit)
+    return [SuggestionResponse.model_validate(row) for row in found]
+
+
+@router.get("/streak", response_model=StreakResponse)
+def streak(
+    db: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> StreakResponse:
+    """How many days in a row something has been recorded, and whether today is one."""
+    today = date.today()
+    days, today_recorded = transactions.streak(db, user.id, today)
+    return StreakResponse(days=days, today_recorded=today_recorded)
 
 
 @router.get(
