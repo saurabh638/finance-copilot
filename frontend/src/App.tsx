@@ -3,14 +3,16 @@ import { useState } from 'react'
 import AccountsPage from './features/accounts/AccountsPage'
 import LoginPage from './features/auth/LoginPage'
 import { useSession } from './features/auth/useSession'
+import CategoriesPage from './features/categories/CategoriesPage'
 import TransactionsPage from './features/transactions/TransactionsPage'
 
 /** The screens the signed-in app can show. */
-type Screen = 'transactions' | 'accounts'
+type Screen = 'transactions' | 'accounts' | 'categories'
 
 const TABS: { id: Screen; label: string }[] = [
   { id: 'transactions', label: 'Transactions' },
   { id: 'accounts', label: 'Accounts' },
+  { id: 'categories', label: 'Categories' },
 ]
 
 /** Show the login screen until there is a session, then the chosen screen. */
@@ -53,7 +55,9 @@ export default function App() {
         </ul>
       </nav>
 
-      {screen === 'transactions' ? <TransactionsPage /> : <AccountsPage />}
+      {screen === 'transactions' && <TransactionsPage />}
+      {screen === 'accounts' && <AccountsPage />}
+      {screen === 'categories' && <CategoriesPage />}
     </>
   )
 }
