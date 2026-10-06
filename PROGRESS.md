@@ -26,7 +26,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M10b Categories in use | done | A movement carries a category; a write-off takes `Unaccounted for spending` or `Unrecorded income` by its sign; a movement can be split between categories; spend by category. Approved. |
 | M10c The picker on the entry forms | done | The category tree offered as a flat `Branch · Child` picker on the recording form, splits between categories with the parts having to add up exactly, and the filing shown and changed on the edit screen. Approved. |
 | M10d The categories page and the spend view | done | A third tab: the tree editable in place — add, rename, move, remove, with the server's own refusals — and the period's spending by branch, with the money in no category reported beside it. M10 is complete. Approved. |
-| M11 Daily check-in screen | not started | |
+| M11 Daily check-in screen | done | The screen that opens the app: the run of days, the amount first, chips built from history, *same as yesterday*, *repeat last*, a catch-up for missed days, and what today holds. Approved. |
 | M12 Recurring and scheduled items | not started | |
 | M13 Interest accrual engine | not started | |
 | M14 Quick text entry | not started | |
@@ -40,10 +40,11 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M10 is complete**: money is filed under names the user owns, and the app answers both sides of the
-question — a movement says what it was filed under, and the categories screen shows what each branch cost
-in a period and how much of the spending has no name on it at all. **The two-week Phase 0 gate is next**,
-which needs the twelve figures only the user can give (`seed`), and real use from there.
+**M11 is done**, and **the two-week Phase 0 gate is next**: the app is used on manual entry, the ledger has to
+stay current, a check-in has to take under a minute, and write-offs have to stay under 5% of spending.
+The gate needs the twelve figures only the user can give (`docker compose exec -T backend python -m app.cli
+seed`), and then real use — nothing else blocks it. After that, M12 (recurring and scheduled items) is the
+next build.
 
 Before the app holds real data:
 
@@ -64,6 +65,10 @@ Before the app holds real data:
   income* and *Unaccounted for spending*. Its balance stands at the stated figure of its last check
   (₹99,000). Nothing real, and useful for looking at M10c's screens.
 - Take a backup before any risky change: `./scripts/backup.sh`.
+- The M11 walkthrough recorded two movements on the *Walkthrough* account today (6 October 2026): a ₹500
+  *Blinkit* entry with no category, taken from a chip and so recorded exactly as that name was last filed,
+  and a ₹2,500 catch-up lump covering 4–6 October. October now reads ₹7,050.00 spent, ₹5,750.00 of it with
+  no name on it.
 - The M10d walkthrough edited the tree and put it back: *Groceries* was renamed to *Fruit & veg* (which the
   movements list immediately said it was filed under), moved under *Home*, then moved back and renamed
   again, so the tree stands as the default set plus *Filter coffee*. The month it showed was
@@ -127,6 +132,19 @@ Before the app holds real data:
   the movements behind it. **Decided**: that belongs with M11's daily screen rather than here.
 - A group can be created as spending or earning only. An `adjustment` name can be made through the API but
   nothing would offer it, so the form does not offer it either.
+- Today's list is read-only: correcting or removing a movement happens on the Transactions screen, which the
+  daily screen says rather than hides. **Decided**: one place owns corrections until a daily screen is shown
+  to be slowed down by the trip.
+- *Same as yesterday* copies a split's first part only, because a split has no single amount to copy. A
+  better answer needs a rule for what "the same as that" means for several parts; it waits for real use.
+- The chips are a fixed row from history: no search-as-you-type and no direction filter. Typing that is
+  parsed rather than tapped is M14's deterministic parser, and the two should not grow into each other.
+- The streak counts any movement, so a write-off or a transfer keeps it going. That is generous on purpose;
+  counting only entries the user typed by hand would be a stricter measure and a less kind one.
+- A name is offered for 90 days after its last use. A habit used less often - a quarterly insurance
+  premium, say - will drop out of the row; the recording form still has it in the picker.
+- The catch-up's covered-from date defaults to yesterday. A longer gap means picking the date, and a
+  preset such as "the last 7 days" may prove faster once the screen has been used for real.
 - The spend report reads every matching posting and adds the figures up in Python, which is what keeps
   money out of the database's arithmetic. One household's month is a few hundred rows; a decade of import
   would want a grouped query, and that is a decision to make then, not now.
