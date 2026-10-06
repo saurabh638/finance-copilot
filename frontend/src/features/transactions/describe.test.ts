@@ -6,6 +6,7 @@ import {
   movementAmountPaise,
   movementAmountText,
   movementLabel,
+  movementFilings,
   movementParties,
   movementTitle,
 } from './describe'
@@ -188,5 +189,54 @@ describe('displayDate', () => {
 
   it('hands back anything it cannot read, rather than inventing a date', () => {
     expect(displayDate('not a date')).toBe('not a date')
+  })
+})
+
+describe('movementFilings', () => {
+  const LABELS = new Map([
+    [11, 'Food & groceries · Groceries'],
+    [12, 'Food & groceries · Eating out'],
+  ])
+
+  it('names the category a movement is filed under', () => {
+    const filed = movement({
+      postings: [{ id: 1, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: 11 }],
+    })
+
+    expect(movementFilings(filed, LABELS)).toEqual(['Food & groceries · Groceries'])
+  })
+
+  it('says nothing for a movement filed under nothing', () => {
+    expect(movementFilings(movement(), LABELS)).toEqual([])
+  })
+
+  it('names each part of a split once, in the order they were filed', () => {
+    expect(movementFilings(SPLIT, LABELS)).toEqual([
+      'Food & groceries · Groceries',
+      'Food & groceries · Eating out',
+    ])
+  })
+
+  it('repeats nothing when two parts are filed under the same name', () => {
+    const twice = movement({
+      postings: [
+        { id: 1, account_id: 1, amount_paise: -30000, kind: 'expense', category_id: 11 },
+        { id: 2, account_id: 1, amount_paise: -20000, kind: 'expense', category_id: 11 },
+      ],
+    })
+
+    expect(movementFilings(twice, LABELS)).toEqual(['Food & groceries · Groceries'])
+  })
+
+  it('says nothing for a transfer, which files none of its sides', () => {
+    expect(movementFilings(TRANSFER, LABELS)).toEqual([])
+  })
+
+  it('leaves out a category that is no longer in the tree', () => {
+    const gone = movement({
+      postings: [{ id: 1, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: 99 }],
+    })
+
+    expect(movementFilings(gone, LABELS)).toEqual([])
   })
 })

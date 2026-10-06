@@ -127,6 +127,22 @@ export function movementAmountText(transaction: Transaction): string {
   return formatPaise(movementAmountPaise(transaction))
 }
 
+/**
+ * The categories a movement is filed under, as labels, without repeats.
+ *
+ * One name for a movement filed under one category, the parts' names for a split,
+ * and nothing at all when there is nothing to say: an unfiled movement, a
+ * transfer, or a category that is no longer in the tree. A name said twice would
+ * read as two filings, so it is said once.
+ */
+export function movementFilings(transaction: Transaction, labels: Map<number, string>): string[] {
+  const found = transaction.postings
+    .map((posting) => (posting.category_id === null ? null : labels.get(posting.category_id)))
+    .filter((label): label is string => label !== undefined && label !== null)
+
+  return [...new Set(found)]
+}
+
 /** Merchant, else the note, else a neutral line so a row is never blank. */
 export function movementTitle(transaction: Transaction): string {
   const merchant = transaction.merchant?.trim() ?? ''

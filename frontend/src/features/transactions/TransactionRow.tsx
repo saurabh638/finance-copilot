@@ -4,6 +4,7 @@ import type { Transaction } from './api'
 import {
   displayDate,
   movementAmountText,
+  movementFilings,
   movementLabel,
   movementParties,
   movementTitle,
@@ -12,6 +13,8 @@ import {
 interface TransactionRowProps {
   transaction: Transaction
   names: Map<number, string>
+  /** The categories this movement was filed under, by id, as labels. */
+  filingLabels: Map<number, string>
   isEditing: boolean
   isDeleting: boolean
   onEdit: () => void
@@ -27,6 +30,7 @@ const SMALL_BUTTON =
 export default function TransactionRow({
   transaction,
   names,
+  filingLabels,
   isEditing,
   isDeleting,
   onEdit,
@@ -34,6 +38,7 @@ export default function TransactionRow({
   children,
 }: TransactionRowProps) {
   const [isConfirming, setIsConfirming] = useState(false)
+  const filings = movementFilings(transaction, filingLabels)
 
   return (
     <li className="px-3 py-3">
@@ -44,6 +49,9 @@ export default function TransactionRow({
             {displayDate(transaction.transaction_date)} · {movementLabel(transaction)} ·{' '}
             {movementParties(transaction, names)}
           </p>
+          {filings.length > 0 && (
+            <p className="text-sm text-slate-600">Filed under {filings.join(', ')}</p>
+          )}
         </div>
         <p className="font-medium text-slate-900">{movementAmountText(transaction)}</p>
       </div>

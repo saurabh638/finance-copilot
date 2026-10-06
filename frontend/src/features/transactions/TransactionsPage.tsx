@@ -3,6 +3,7 @@ import { useState } from 'react'
 import PageHeader from '../../components/PageHeader'
 import { todayIso } from '../../lib/dates'
 import { useAccounts } from '../accounts/useAccounts'
+import { categoryLabel } from '../categories/tree'
 import { useCategories } from '../categories/useCategories'
 import TransactionEditor from './TransactionEditor'
 import TransactionFilters from './TransactionFilters'
@@ -45,6 +46,9 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
   const list = accounts.data ?? []
   const names = new Map(list.map((account) => [account.id, account.name]))
   const tree = categories.data ?? []
+  const filingLabels = new Map(
+    tree.map((category) => [category.id, categoryLabel(tree, category.id) ?? category.name]),
+  )
   const shown = movements.data?.pages.flat() ?? []
   const isFiltered = filter.accountId !== null || filter.from !== '' || filter.to !== ''
 
@@ -141,6 +145,7 @@ export default function TransactionsPage({ today = todayIso() }: TransactionsPag
                 key={transaction.id}
                 transaction={transaction}
                 names={names}
+                filingLabels={filingLabels}
                 isEditing={editingId === transaction.id}
                 isDeleting={deletingId === transaction.id}
                 onEdit={() => openEditor(transaction.id)}

@@ -18,7 +18,14 @@ const EXPENSE: Transaction = {
   postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: null }],
 }
 
+/** The same movement, filed under a category. */
+const FILED: Transaction = {
+  ...EXPENSE,
+  postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: 11 }],
+}
+
 interface RenderOptions {
+  transaction?: Transaction
   isEditing?: boolean
   isDeleting?: boolean
   onEdit?: () => void
@@ -26,7 +33,11 @@ interface RenderOptions {
   children?: React.ReactNode
 }
 
+/** The labels the page builds from the tree: id to `Branch · Name`. */
+const FILINGS = new Map([[11, 'Food & groceries · Groceries']])
+
 function renderRow({
+  transaction = EXPENSE,
   isEditing = false,
   isDeleting = false,
   onEdit = vi.fn(),
@@ -36,8 +47,9 @@ function renderRow({
   render(
     <ul>
       <TransactionRow
-        transaction={EXPENSE}
+        transaction={transaction}
         names={NAMES}
+        filingLabels={FILINGS}
         isEditing={isEditing}
         isDeleting={isDeleting}
         onEdit={onEdit}
@@ -57,6 +69,18 @@ describe('TransactionRow', () => {
     expect(screen.getByText('Blinkit')).toBeInTheDocument()
     expect(screen.getByText('4 Oct 2026 · Money out · SBI')).toBeInTheDocument()
     expect(screen.getByText('-₹500.00')).toBeInTheDocument()
+  })
+
+  it('says which category the movement was filed under', () => {
+    renderRow({ transaction: FILED })
+
+    expect(screen.getByText('Filed under Food & groceries · Groceries')).toBeInTheDocument()
+  })
+
+  it('says nothing about a filing when there is none', () => {
+    renderRow()
+
+    expect(screen.queryByText(/^Filed under/)).not.toBeInTheDocument()
   })
 
   it('asks before removing anything', () => {
