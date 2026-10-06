@@ -24,7 +24,8 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M9b The ten-second screen | done | *Check balance* on an account: enter the real balance, see the ledger's figure, the bank's and the difference, then write it off or put it away, with the nudge and the month's share. M9 is complete. Approved. |
 | M10a The category tree | done | `Category` model, migration 0008 (the table and `postings.category_id`), the seeded Indian-household set, tree CRUD with its rules, and `seed-categories`. Approved. |
 | M10b Categories in use | done | A movement carries a category; a write-off takes `Unaccounted for spending` or `Unrecorded income` by its sign; a movement can be split between categories; spend by category. Approved. |
-| M10c The category screens | not started | The picker on the entry forms, the categories page, and the spend-by-category view. |
+| M10c The picker on the entry forms | done | The category tree offered as a flat `Branch · Child` picker on the recording form, splits between categories with the parts having to add up exactly, and the filing shown and changed on the edit screen. Approved. |
+| M10d The categories page and the spend view | not started | A third tab: the tree editable in place, and the month's spending read by branch. |
 | M11 Daily check-in screen | not started | |
 | M12 Recurring and scheduled items | not started | |
 | M13 Interest accrual engine | not started | |
@@ -39,11 +40,10 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M10b is done**: money and the names it is filed under are joined up — a movement can be filed under one
-category, a purchase spread across several, a write-off takes the tree's own name for its direction, and
-`GET /categories/spend` answers what each category held in a period, with a branch's figure being the
-whole of its branch. **M10c is next** — the picker on the entry forms, the categories page, and the
-spend-by-category view — after which the two-week Phase 0 gate can begin.
+**M10c is done**: a movement can be filed from the app — a flat picker of `Branch · Child`, a split
+between several categories whose parts must add up to the amount exactly, and the filing shown and
+changed on the edit screen. **M10d is next** — the categories page and the spend-by-category view, after
+which M10 is complete and the two-week Phase 0 gate can begin.
 
 Before the app holds real data:
 
@@ -64,6 +64,10 @@ Before the app holds real data:
   income* and *Unaccounted for spending*. Its balance stands at the stated figure of its last check
   (₹99,000). Nothing real, and useful for looking at M10c's screens.
 - Take a backup before any risky change: `./scripts/backup.sh`.
+- The M10c walkthrough added two movements to the *Walkthrough* account on 6 October 2026: ₹250 with no
+  category (it was filed under *Groceries*, then refiled to *Eating out*, then cleared, which is the
+  clearing path) and a ₹500 shop split between *Groceries* and *Eating out*. Useful for looking at
+  M10d's screens alongside the category tree.
 
 ## Open questions
 
@@ -100,7 +104,14 @@ Before the app holds real data:
   accepted and dropped. Same open question as `PATCH /accounts` above; the fix is one rule for every
   route rather than a second special case.
 - The spend report has no row for uncategorised spending, so its rows do not add up to total spending for
-  the period. Proposed: a report-only *Uncategorised* row, once the M10c screen shows the figure.
+  the period. **Decided**: a report-only *Uncategorised* row arrives with the M10d spend view, where the
+  figure can be shown and explained rather than sitting in the API on its own.
+- The Transactions list does not say which category a movement was filed under; the filing is only
+  visible when a row is opened. **Decided**: M10d shows it in the row, so the work of filing is visible
+  without opening anything.
+- The picker is one flat list of `Branch · Child` names, which is fine on a desktop and long on a phone
+  (43 names today). Kept as it is deliberately; M11's phone screen is where a two-step branch-then-name
+  picker should be judged, with a thumb rather than a mouse.
 - The spend report reads every matching posting and adds the figures up in Python, which is what keeps
   money out of the database's arithmetic. One household's month is a few hundred rows; a decade of import
   would want a grouped query, and that is a decision to make then, not now.
