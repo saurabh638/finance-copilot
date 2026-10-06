@@ -16,11 +16,6 @@ from app.models import Account, BalanceCheck, Posting, PostingKind, Transaction
 from app.services.accounts import get_account
 from app.services.transactions import balance, record_adjustment, require_on_or_after_opening
 
-# Until categories arrive in M10, a write-off says in words what it is. The sign
-# of the difference decides which of the two it is.
-NOTE_UNACCOUNTED = "Unaccounted for spending"
-NOTE_FOUND = "Unrecorded income"
-
 
 class BalanceCheckNotFoundError(LookupError):
     """Raised when a check does not exist for the user's account."""
@@ -62,11 +57,6 @@ class AdjustmentShare:
     share_percent: int
 
 
-def note_for(difference_paise: int) -> str:
-    """The wording a write-off carries, which its sign decides."""
-    return NOTE_FOUND if difference_paise > 0 else NOTE_UNACCOUNTED
-
-
 def _record(check: BalanceCheck, adjustment_transaction_id: int | None) -> BalanceCheckRecord:
     """One check as the API reports it, from the row that keeps it."""
     return BalanceCheckRecord(
@@ -81,14 +71,18 @@ def _record(check: BalanceCheck, adjustment_transaction_id: int | None) -> Balan
 
 
 def _write_off(db: DbSession, user_id: int, account: Account, check: BalanceCheck) -> int:
-    """Post the difference a check recorded, and point the check at the posting."""
+    """Post the difference a check recorded, and point the check at the posting.
+
+    The write-off is worded by the category it is filed under - the tree's own
+    `Unaccounted for spending` or `Unrecorded income`, chosen by the sign of the
+    difference - so it carries no note of its own.
+    """
     transaction = record_adjustment(
         db,
         user_id,
         account.id,
         check.difference_paise,
         check.checked_on,
-        note_for(check.difference_paise),
     )
     check.adjustment_posting_id = db.scalars(
         select(Posting.id).where(Posting.transaction_id == transaction.id)

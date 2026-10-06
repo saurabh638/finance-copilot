@@ -16,6 +16,7 @@ from app.models import AccountType, CaptureMode, Posting, PostingKind, User
 from app.schemas.account import AccountCreate
 from app.services.accounts import create_account, soft_delete_account
 from app.services.auth import create_user
+from app.services.categories import seed_defaults
 
 EMAIL = "owner@example.com"
 PASSPHRASE = "s3cret-passphrase"
@@ -148,7 +149,8 @@ def test_the_write_off_is_a_visible_posting_of_its_own_kind(
     listed = client.get("/api/v1/transactions").json()
     assert len(listed) == 1
     assert listed[0]["id"] == body["adjustment_transaction_id"]
-    assert listed[0]["note"] == "Unaccounted for spending"
+    # No note: the wording is the category the write-off was filed under.
+    assert listed[0]["note"] is None
     assert listed[0]["postings"][0]["kind"] == "adjustment"
     assert listed[0]["postings"][0]["amount_paise"] == -500_00
 
@@ -156,13 +158,20 @@ def test_the_write_off_is_a_visible_posting_of_its_own_kind(
     assert posting.amount_paise == -500_00
 
 
-def test_money_found_carries_its_own_wording(client: TestClient, db: Session, user: User) -> None:
+def test_a_write_off_is_worded_by_its_category_and_not_by_a_note(
+    client: TestClient, db: Session, user: User
+) -> None:
+    """M10 files a write-off, so the wording lives there and nowhere else."""
     _sign_in(client)
     account_id = _account(db, user)
+    seed_defaults(db, user.id)
 
     _check(client, account_id, OPENING_PAISE + 1_00_000, adjust=True)
 
-    assert client.get("/api/v1/transactions").json()[0]["note"] == "Unrecorded income"
+    written = client.get("/api/v1/transactions").json()[0]
+    filing = {row["id"]: row["name"] for row in client.get("/api/v1/categories").json()}
+    assert filing[written["postings"][0]["category_id"]] == "Unrecorded income"
+    assert written["note"] is None
 
 
 def test_a_check_that_is_not_written_off_changes_nothing(
@@ -390,7 +399,7 @@ def test_a_recorded_check_can_be_written_off_later(
     # written off, so the ledger reads as it did when the user looked.
     written_off = client.get("/api/v1/transactions?kind=adjustment").json()
     assert [t["transaction_date"] for t in written_off] == [CHECKED_ON]
-    assert written_off[0]["note"] == "Unaccounted for spending"
+    assert written_off[0]["note"] is None
 
 
 def test_a_check_cannot_be_written_off_twice(client: TestClient, db: Session, user: User) -> None:
