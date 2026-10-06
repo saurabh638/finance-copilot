@@ -68,10 +68,14 @@ def _tree(db: Session, user: User) -> tuple[int, int, int]:
     return group, child, other
 
 
-def _rows(client: TestClient, query: str = "") -> dict[str, dict[str, Any]]:
+def _report(client: TestClient, query: str = "") -> dict[str, Any]:
     response = client.get(f"{SPEND}{query}")
     assert response.status_code == 200
-    return {row["name"]: row for row in response.json()}
+    return response.json()
+
+
+def _rows(client: TestClient, query: str = "") -> dict[str, dict[str, Any]]:
+    return {row["name"]: row for row in _report(client, query)["rows"]}
 
 
 def test_spending_needs_a_session(client: TestClient) -> None:
@@ -83,7 +87,78 @@ def test_an_empty_tree_reports_nothing_rather_than_failing(
 ) -> None:
     _sign_in(client)
 
-    assert _rows(client) == {}
+    assert _report(client) == {"rows": [], "uncategorised_paise": 0, "total_paise": 0}
+
+
+def test_uncategorised_spending_is_reported_apart_from_the_tree(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    _tree(db, user)
+    _expense(client, account_id, 30_000, "2026-10-04")
+
+    report = _report(client)
+
+    assert report["uncategorised_paise"] == 30_000
+    assert _rows(client)["Groceries"]["direct_paise"] == 0
+
+
+def test_the_total_is_the_rows_plus_what_is_in_no_row(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    _, child, other = _tree(db, user)
+    _expense(client, account_id, 30_000, "2026-10-04", category_id=child)
+    _expense(client, account_id, 20_000, "2026-10-05", category_id=other)
+    _expense(client, account_id, 10_000, "2026-10-06")
+
+    report = _report(client)
+    filed = sum(row["direct_paise"] for row in report["rows"])
+
+    assert filed == 50_000
+    assert report["uncategorised_paise"] == 10_000
+    assert report["total_paise"] == 60_000
+
+
+def test_the_period_narrows_the_uncategorised_figure_too(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    _tree(db, user)
+    _expense(client, account_id, 10_000, "2026-09-30")
+    _expense(client, account_id, 20_000, "2026-10-05")
+
+    report = _report(client, "?from=2026-10-01&to=2026-10-31")
+
+    assert report["uncategorised_paise"] == 20_000
+    assert report["total_paise"] == 20_000
+
+
+def test_an_uncategorised_income_is_not_spending_either(
+    client: TestClient, db: Session, user: User
+) -> None:
+    """Money arriving with no category is still money arriving."""
+    _sign_in(client)
+    account_id = _account(db, user)
+    _tree(db, user)
+    unfiled = client.post(
+        TRANSACTIONS,
+        json={
+            "kind": "income",
+            "account_id": account_id,
+            "amount_paise": 9_00_000_00,
+            "transaction_date": "2026-10-05",
+        },
+    )
+    assert unfiled.status_code == 201
+
+    report = _report(client)
+
+    assert report["uncategorised_paise"] == 0
+    assert report["total_paise"] == 0
 
 
 def test_every_expense_category_is_a_row_even_with_nothing_spent(
@@ -158,7 +233,7 @@ def test_a_split_is_counted_under_each_of_its_parts(
     assert rows["Travel"]["total_paise"] == 20_000
 
 
-def test_uncategorised_spending_is_counted_nowhere(
+def test_uncategorised_spending_stays_out_of_the_trees_rows(
     client: TestClient, db: Session, user: User
 ) -> None:
     _sign_in(client)
@@ -171,6 +246,8 @@ def test_uncategorised_spending_is_counted_nowhere(
     assert rows["Food"]["total_paise"] == 0
     assert rows["Groceries"]["total_paise"] == 0
     assert set(rows) == {"Food", "Groceries", "Travel"}
+    # It is reported, but apart from the tree: there is no category to file it under.
+    assert _report(client)["uncategorised_paise"] == 30_000
 
 
 def test_income_and_write_offs_are_not_spending(
@@ -261,8 +338,9 @@ def test_another_users_spending_is_not_in_the_report(
     _sign_in(client)
     other = create_user(db, "someone@example.com", "another-passphrase")
     other_account = _account(db, other)
-    theirs = create_category(db, other.id, "Their travel", kind=CategoryKind.EXPENSE).id
-    # A session of their own, so the recording goes through the same routes.
+    theirs = create_category(
+        db, other.id, "Their travel", kind=CategoryKind.EXPENSE
+    ).id  # A session of their own, so the recording goes through the same routes.
     with TestClient(client.app) as theirs_only:
         sign_in = theirs_only.post(
             "/api/v1/auth/login",
@@ -288,3 +366,4 @@ def test_another_users_spending_is_not_in_the_report(
 
     assert "Their travel" not in rows
     assert rows["Travel"]["total_paise"] == 500_00
+    assert _report(client)["uncategorised_paise"] == 0

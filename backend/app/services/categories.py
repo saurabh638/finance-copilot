@@ -15,7 +15,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as DbSession
 
-from app.core.ledger import roll_up
+from app.core.ledger import roll_up, sum_paise
 from app.core.money import add_paise
 from app.models import Category, CategoryKind, Posting, PostingKind, Transaction
 
@@ -65,6 +65,15 @@ class CategorySpend:
     parent_id: int | None
     kind: CategoryKind
     direct_paise: int
+    total_paise: int
+
+
+@dataclass(frozen=True)
+class SpendReport:
+    """A period's spending: every expense category, and the money in none of them."""
+
+    rows: list[CategorySpend]
+    uncategorised_paise: int
     total_paise: int
 
 
@@ -171,28 +180,29 @@ def spend_by_category(
     user_id: int,
     from_date: date | None = None,
     to_date: date | None = None,
-) -> list[CategorySpend]:
-    """What was spent under each expense category in a period, children rolled in.
+) -> SpendReport:
+    """What was spent in a period: every expense category, and the money in none.
 
-    Spending is the expense postings filed under a category: income is not
-    spending, a transfer spends nothing, and a write-off has its own report. The
-    figures come from the postings rather than from any stored total, so a
-    correction to a movement shows up here the moment it is made. Spending filed
-    under no category is counted nowhere, because there is no row for it.
+    Spending is the expense postings: income is not spending, a transfer spends
+    nothing, and a write-off has its own report. The figures come from the
+    postings rather than from any stored total, so a correction to a movement
+    shows up here the moment it is made. Spending filed under no category has no
+    row to appear in, so it is reported beside the rows and added into the
+    period's whole: rows that do not add up to what was spent would be worse than
+    no report.
     """
-    rows = db.execute(_live_spending(user_id, from_date, to_date))
     direct: dict[int, int] = {}
-    for category_id, amount_paise in rows:
-        # The query already excludes filings with no category; saying so again
-        # keeps that a fact the types can read as well.
-        if category_id is not None:
-            # Postings of an expense are negative; the report speaks in magnitudes.
+    uncategorised = 0
+    for category_id, amount_paise in db.execute(_live_spending(user_id, from_date, to_date)):
+        # Postings of an expense are negative; the report speaks in magnitudes.
+        if category_id is None:
+            uncategorised = add_paise(uncategorised, -amount_paise)
+        else:
             direct[category_id] = add_paise(direct.get(category_id, 0), -amount_paise)
 
     categories = [row for row in list_categories(db, user_id) if row.kind is CategoryKind.EXPENSE]
     totals = roll_up({row.id: row.parent_id for row in categories}, direct)
-
-    return [
+    rows = [
         CategorySpend(
             id=row.id,
             name=row.name,
@@ -204,12 +214,20 @@ def spend_by_category(
         for row in categories
     ]
 
+    # Each posting is either in a row or in the remainder, never in both, so the
+    # rows' own figures and the remainder are the whole period exactly.
+    return SpendReport(
+        rows=rows,
+        uncategorised_paise=uncategorised,
+        total_paise=add_paise(uncategorised, sum_paise(direct.values())),
+    )
+
 
 def _live_spending(
     user_id: int, from_date: date | None, to_date: date | None
 ) -> Select[int | None, int]:
-    """One row per live expense posting filed under a category: that category, and
-    the amount as it was recorded."""
+    """One row per live expense posting: the category it is filed under, which may
+    be none, and the amount as it was recorded."""
     statement = (
         select(Posting.category_id, Posting.amount_paise)
         .join(Transaction, Posting.transaction_id == Transaction.id)
@@ -218,7 +236,6 @@ def _live_spending(
             Transaction.deleted_at.is_(None),
             Posting.deleted_at.is_(None),
             Posting.kind == PostingKind.EXPENSE,
-            Posting.category_id.is_not(None),
         )
     )
     if from_date is not None:

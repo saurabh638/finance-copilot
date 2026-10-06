@@ -15,9 +15,9 @@ from app.models import User
 from app.schemas.category import (
     CategoryCreate,
     CategoryResponse,
-    CategorySpendResponse,
     CategoryUpdate,
     DefaultsResponse,
+    SpendReportResponse,
 )
 from app.services import categories
 from app.services.categories import (
@@ -136,21 +136,24 @@ def remove(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/spend", response_model=list[CategorySpendResponse])
+@router.get("/spend", response_model=SpendReportResponse)
 def spend(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     db: Session = Depends(get_session),
     user: User = Depends(get_current_user),
-) -> list[CategorySpendResponse]:
-    """What was spent under each expense category in a period, children rolled in.
+) -> SpendReportResponse:
+    """What was spent in a period: every expense category, and the money in none.
 
     `from` and `to` are inclusive dates on the transaction, and either may be
     left out. A category with nothing spent is a row of zeros rather than a
-    missing row, so the tree the client draws is the whole tree.
+    missing row, so the tree the client draws is the whole tree; spending filed
+    under no category has no row at all, so it comes back beside them and is
+    counted in the period's `total_paise`.
     """
-    rows = categories.spend_by_category(db, user.id, from_date=from_date, to_date=to_date)
-    return [CategorySpendResponse.model_validate(row) for row in rows]
+    return SpendReportResponse.model_validate(
+        categories.spend_by_category(db, user.id, from_date=from_date, to_date=to_date)
+    )
 
 
 @router.post("/defaults", response_model=DefaultsResponse)

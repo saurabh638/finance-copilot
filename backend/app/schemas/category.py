@@ -63,3 +63,19 @@ class CategorySpendResponse(BaseModel):
     kind: CategoryKind
     direct_paise: int
     total_paise: int
+
+
+class SpendReportResponse(BaseModel):
+    """A period's spending: the tree, the money in no category, and the whole.
+
+    Spending filed under no category has no row to appear in, so it is reported
+    beside the rows rather than left out: otherwise the rows would not add up to
+    what the period actually cost. `total_paise` is the two together, so a client
+    never has to decide what counts as spending.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    rows: list[CategorySpendResponse]
+    uncategorised_paise: int
+    total_paise: int
