@@ -22,7 +22,7 @@ function movement(overrides: Partial<Transaction> = {}): Transaction {
     merchant: 'Blinkit',
     note: null,
     source: 'manual',
-    postings: [{ id: 1, account_id: 1, amount_paise: -50000, kind: 'expense' }],
+    postings: [{ id: 1, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: null }],
     ...overrides,
   }
 }
@@ -34,19 +34,55 @@ const TRANSFER: Transaction = {
   note: null,
   source: 'manual',
   postings: [
-    { id: 2, account_id: 1, amount_paise: -100000, kind: 'transfer' },
-    { id: 3, account_id: 2, amount_paise: 100000, kind: 'transfer' },
+    { id: 2, account_id: 1, amount_paise: -100000, kind: 'transfer', category_id: null },
+    { id: 3, account_id: 2, amount_paise: 100000, kind: 'transfer', category_id: null },
+  ],
+}
+
+/** A ₹500 shop filed as ₹300 of groceries and ₹200 of eating out. */
+const SPLIT: Transaction = {
+  id: 4,
+  transaction_date: '2026-10-05',
+  merchant: 'Big Bazaar',
+  note: null,
+  source: 'manual',
+  postings: [
+    { id: 4, account_id: 1, amount_paise: -30000, kind: 'expense', category_id: 11 },
+    { id: 5, account_id: 1, amount_paise: -20000, kind: 'expense', category_id: 12 },
+  ],
+}
+
+/** Money arriving under two names: a salary and a refund, say. */
+const SPLIT_INCOME: Transaction = {
+  id: 6,
+  transaction_date: '2026-10-06',
+  merchant: null,
+  note: 'October',
+  source: 'manual',
+  postings: [
+    { id: 6, account_id: 1, amount_paise: 600000, kind: 'income', category_id: 3 },
+    { id: 7, account_id: 1, amount_paise: 400000, kind: 'income', category_id: 4 },
   ],
 }
 
 describe('movementAmountText', () => {
+  it('shows a split as the whole that left the account, with its minus', () => {
+    expect(movementAmountText(SPLIT)).toBe('-₹500.00')
+  })
+
+  it('shows an income split as the whole that arrived', () => {
+    expect(movementAmountText(SPLIT_INCOME)).toBe('₹10,000.00')
+  })
+
   it('shows money that left an account with a minus, in rupees', () => {
     expect(movementAmountText(movement())).toBe('-₹500.00')
   })
 
   it('shows money that arrived without a sign of its own', () => {
     const income = movement({
-      postings: [{ id: 1, account_id: 1, amount_paise: 2000000, kind: 'income' }],
+      postings: [
+        { id: 1, account_id: 1, amount_paise: 2000000, kind: 'income', category_id: null },
+      ],
     })
 
     expect(movementAmountText(income)).toBe('₹20,000.00')
@@ -58,7 +94,9 @@ describe('movementAmountText', () => {
 
   it('keeps every paise of a large amount', () => {
     const large = movement({
-      postings: [{ id: 1, account_id: 1, amount_paise: -123456789, kind: 'expense' }],
+      postings: [
+        { id: 1, account_id: 1, amount_paise: -123456789, kind: 'expense', category_id: null },
+      ],
     })
 
     expect(movementAmountText(large)).toBe('-₹12,34,567.89')
@@ -73,6 +111,11 @@ describe('movementAmountPaise', () => {
   it('reports the amount a transfer moved', () => {
     expect(movementAmountPaise(TRANSFER)).toBe(100000)
   })
+
+  it('reports the whole of a split, added up from its parts', () => {
+    expect(movementAmountPaise(SPLIT)).toBe(50000)
+    expect(movementAmountPaise(SPLIT_INCOME)).toBe(1000000)
+  })
 })
 
 describe('movementLabel', () => {
@@ -80,13 +123,22 @@ describe('movementLabel', () => {
     expect(movementLabel(movement())).toBe('Money out')
     expect(
       movementLabel(
-        movement({ postings: [{ id: 1, account_id: 1, amount_paise: 100, kind: 'income' }] }),
+        movement({
+          postings: [
+            { id: 1, account_id: 1, amount_paise: 100, kind: 'income', category_id: null },
+          ],
+        }),
       ),
     ).toBe('Money in')
   })
 
   it('calls two postings a transfer, not spending', () => {
     expect(movementLabel(TRANSFER)).toBe('Transfer')
+  })
+
+  it('names a split by what it did, because it is not a transfer', () => {
+    expect(movementLabel(SPLIT)).toBe('Money out')
+    expect(movementLabel(SPLIT_INCOME)).toBe('Money in')
   })
 })
 
@@ -99,9 +151,15 @@ describe('movementParties', () => {
     expect(movementParties(TRANSFER, NAMES)).toBe('SBI → Central Bank')
   })
 
+  it('names the one account a split left, once and not twice', () => {
+    expect(movementParties(SPLIT, NAMES)).toBe('SBI')
+  })
+
   it('stands in for an account that is no longer in the list', () => {
     const gone = movement({
-      postings: [{ id: 1, account_id: 9, amount_paise: -50000, kind: 'expense' }],
+      postings: [
+        { id: 1, account_id: 9, amount_paise: -50000, kind: 'expense', category_id: null },
+      ],
     })
 
     expect(movementParties(gone, NAMES)).toBe('Another account')

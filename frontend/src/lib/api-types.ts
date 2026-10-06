@@ -319,9 +319,101 @@ export interface paths {
     head?: never
     /**
      * Patch
-     * @description Change the date, merchant, note, or the amount of a single posting.
+     * @description Change the date, merchant, note, the amount, or the filing of a movement.
      */
     patch: operations['patch_api_v1_transactions__transaction_id__patch']
+    trace?: never
+  }
+  '/api/v1/categories': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Index
+     * @description The user's categories: each branch, then the names under it.
+     */
+    get: operations['index_api_v1_categories_get']
+    put?: never
+    /**
+     * Create
+     * @description Add a name to the tree, as a branch of its own or under one.
+     */
+    post: operations['create_api_v1_categories_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/categories/{category_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Remove
+     * @description Remove a category. The row is kept, so the history stays readable.
+     */
+    delete: operations['remove_api_v1_categories__category_id__delete']
+    options?: never
+    head?: never
+    /**
+     * Update
+     * @description Rename a category, move it in the tree, or both.
+     */
+    patch: operations['update_api_v1_categories__category_id__patch']
+    trace?: never
+  }
+  '/api/v1/categories/spend': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Spend
+     * @description What was spent under each expense category in a period, children rolled in.
+     *
+     *     `from` and `to` are inclusive dates on the transaction, and either may be
+     *     left out. A category with nothing spent is a row of zeros rather than a
+     *     missing row, so the tree the client draws is the whole tree.
+     */
+    get: operations['spend_api_v1_categories_spend_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/categories/defaults': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Create Defaults
+     * @description Seed the default set, which does something only on an empty tree.
+     */
+    post: operations['create_defaults_api_v1_categories_defaults_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
 }
@@ -541,6 +633,84 @@ export interface components {
      */
     CaptureMode: 'statement_import' | 'manual_only' | 'hybrid'
     /**
+     * CategoryCreate
+     * @description A new name in the tree.
+     *
+     *     `kind` is required for a top-level category and ignored for a child, which
+     *     carries its parent's kind; the service words the refusal either way.
+     */
+    CategoryCreate: {
+      /** Name */
+      name: string
+      kind?: components['schemas']['CategoryKind'] | null
+      /** Parent Id */
+      parent_id?: number | null
+    }
+    /**
+     * CategoryKind
+     * @description What a category is for, which its children inherit from it.
+     *
+     *     `adjustment` is the kind the two write-off names carry, so a balance check's
+     *     difference has a home without pretending to be spending or income.
+     * @enum {string}
+     */
+    CategoryKind: 'expense' | 'income' | 'adjustment'
+    /**
+     * CategoryResponse
+     * @description One category as it is kept.
+     */
+    CategoryResponse: {
+      /** Id */
+      id: number
+      /** Name */
+      name: string
+      /** Parent Id */
+      parent_id: number | null
+      kind: components['schemas']['CategoryKind']
+    }
+    /**
+     * CategorySpendResponse
+     * @description One row of the spend report.
+     *
+     *     `direct_paise` is what was filed under this category itself; `total_paise`
+     *     adds everything filed under its children, so a group answers for its whole
+     *     branch. Categories with nothing spent are rows too, with zeros.
+     */
+    CategorySpendResponse: {
+      /** Id */
+      id: number
+      /** Name */
+      name: string
+      /** Parent Id */
+      parent_id: number | null
+      kind: components['schemas']['CategoryKind']
+      /** Direct Paise */
+      direct_paise: number
+      /** Total Paise */
+      total_paise: number
+    }
+    /**
+     * CategoryUpdate
+     * @description What may change: the name, where it sits, or both.
+     *
+     *     An omitted field is left alone; an explicit `parent_id: null` moves the
+     *     category to the top level, which is why the router tells the difference.
+     */
+    CategoryUpdate: {
+      /** Name */
+      name?: string | null
+      /** Parent Id */
+      parent_id?: number | null
+    }
+    /**
+     * DefaultsResponse
+     * @description What the default set added, which is nothing when the tree was not empty.
+     */
+    DefaultsResponse: {
+      /** Created */
+      created: components['schemas']['CategoryResponse'][]
+    }
+    /**
      * ExpenseCreate
      * @description Money leaving one account. The amount is positive; the kind sets the sign.
      */
@@ -554,15 +724,19 @@ export interface components {
       merchant?: string | null
       /** Note */
       note?: string | null
+      /** Account Id */
+      account_id: number
+      /** Amount Paise */
+      amount_paise: number
+      /** Category Id */
+      category_id?: number | null
+      /** Parts */
+      parts?: components['schemas']['SplitPartCreate'][] | null
       /**
        * @description discriminator enum property added by openapi-typescript
        * @enum {string}
        */
       kind: 'expense'
-      /** Account Id */
-      account_id: number
-      /** Amount Paise */
-      amount_paise: number
     }
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -593,15 +767,19 @@ export interface components {
       merchant?: string | null
       /** Note */
       note?: string | null
+      /** Account Id */
+      account_id: number
+      /** Amount Paise */
+      amount_paise: number
+      /** Category Id */
+      category_id?: number | null
+      /** Parts */
+      parts?: components['schemas']['SplitPartCreate'][] | null
       /**
        * @description discriminator enum property added by openapi-typescript
        * @enum {string}
        */
       kind: 'income'
-      /** Account Id */
-      account_id: number
-      /** Amount Paise */
-      amount_paise: number
     }
     /**
      * InterestRateCreate
@@ -685,6 +863,8 @@ export interface components {
       /** Amount Paise */
       amount_paise: number
       kind: components['schemas']['PostingKind']
+      /** Category Id */
+      category_id: number | null
     }
     /**
      * RateFrequency
@@ -692,6 +872,16 @@ export interface components {
      * @enum {string}
      */
     RateFrequency: 'daily' | 'monthly' | 'quarterly' | 'yearly'
+    /**
+     * SplitPartCreate
+     * @description One part of a movement the user split between categories.
+     */
+    SplitPartCreate: {
+      /** Amount Paise */
+      amount_paise: number
+      /** Category Id */
+      category_id: number
+    }
     /**
      * TransactionResponse
      * @description A transaction and the postings that carry its amounts.
@@ -722,9 +912,9 @@ export interface components {
      * TransactionUpdate
      * @description What may change. The accounts and the kind never do.
      *
-     *     An omitted field is left alone; an explicit null clears it. The amount may
-     *     only be changed when the transaction has a single posting, because a transfer
-     *     is two postings that must keep summing to zero.
+     *     An omitted field is left alone; an explicit null clears it. The amount and
+     *     the category may only be changed when the transaction has a single posting,
+     *     because a transfer is two postings that must keep summing to zero.
      */
     TransactionUpdate: {
       /** Transaction Date */
@@ -735,6 +925,8 @@ export interface components {
       note?: string | null
       /** Amount Paise */
       amount_paise?: number | null
+      /** Category Id */
+      category_id?: number | null
     }
     /**
      * TransferCreate
@@ -1590,6 +1782,210 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  index_api_v1_categories_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryResponse'][]
+        }
+      }
+    }
+  }
+  create_api_v1_categories_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CategoryCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryResponse']
+        }
+      }
+      /** @description A rule of the tree was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  remove_api_v1_categories__category_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        category_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The category does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Something is filed under the category */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_api_v1_categories__category_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        category_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CategoryUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryResponse']
+        }
+      }
+      /** @description A rule of the tree was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The category does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  spend_api_v1_categories_spend_get: {
+    parameters: {
+      query?: {
+        from?: string | null
+        to?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategorySpendResponse'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_defaults_api_v1_categories_defaults_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DefaultsResponse']
         }
       }
     }

@@ -15,7 +15,7 @@ const EXPENSE: Transaction = {
   merchant: 'Blinkit',
   note: null,
   source: 'manual',
-  postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense' }],
+  postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: null }],
 }
 
 interface RenderOptions {

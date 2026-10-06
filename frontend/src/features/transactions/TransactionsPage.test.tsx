@@ -55,7 +55,7 @@ const EXPENSE: Transaction = {
   merchant: 'Blinkit',
   note: null,
   source: 'manual',
-  postings: [{ id: 5, account_id: 1, amount_paise: -50000, kind: 'expense' }],
+  postings: [{ id: 5, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: null }],
 }
 
 const TRANSFER: Transaction = {
@@ -65,8 +65,8 @@ const TRANSFER: Transaction = {
   note: null,
   source: 'manual',
   postings: [
-    { id: 6, account_id: 1, amount_paise: -100000, kind: 'transfer' },
-    { id: 7, account_id: 2, amount_paise: 100000, kind: 'transfer' },
+    { id: 6, account_id: 1, amount_paise: -100000, kind: 'transfer', category_id: null },
+    { id: 7, account_id: 2, amount_paise: 100000, kind: 'transfer', category_id: null },
   ],
 }
 

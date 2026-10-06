@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { Category } from '../categories/api'
 import type { Transaction, TransactionUpdate } from './api'
 import TransactionEditor from './TransactionEditor'
 
@@ -10,7 +11,7 @@ const EXPENSE: Transaction = {
   merchant: 'Blinkit',
   note: 'milk',
   source: 'manual',
-  postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense' }],
+  postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense', category_id: null }],
 }
 
 const TRANSFER: Transaction = {
@@ -20,8 +21,34 @@ const TRANSFER: Transaction = {
   note: null,
   source: 'manual',
   postings: [
-    { id: 10, account_id: 1, amount_paise: -100000, kind: 'transfer' },
-    { id: 11, account_id: 2, amount_paise: 100000, kind: 'transfer' },
+    { id: 10, account_id: 1, amount_paise: -100000, kind: 'transfer', category_id: null },
+    { id: 11, account_id: 2, amount_paise: 100000, kind: 'transfer', category_id: null },
+  ],
+}
+
+const CATEGORIES: Category[] = [
+  { id: 10, name: 'Food & groceries', kind: 'expense', parent_id: null },
+  { id: 11, name: 'Groceries', kind: 'expense', parent_id: 10 },
+]
+
+/** The same movement, filed under the category given. */
+function filed(category_id: number | null): Transaction {
+  return {
+    ...EXPENSE,
+    postings: [{ id: 9, account_id: 1, amount_paise: -50000, kind: 'expense', category_id }],
+  }
+}
+
+/** A ₹500 shop filed as ₹300 of groceries and ₹200 of the branch itself. */
+const SPLIT: Transaction = {
+  id: 12,
+  transaction_date: '2026-10-04',
+  merchant: 'Big Bazaar',
+  note: null,
+  source: 'manual',
+  postings: [
+    { id: 13, account_id: 1, amount_paise: -30000, kind: 'expense', category_id: 11 },
+    { id: 14, account_id: 1, amount_paise: -20000, kind: 'expense', category_id: 10 },
   ],
 }
 
@@ -40,6 +67,7 @@ function renderEditor({
   render(
     <TransactionEditor
       transaction={transaction}
+      categories={CATEGORIES}
       onSave={onSave}
       isSaving={isSaving}
       errorMessage={errorMessage}
@@ -90,6 +118,53 @@ describe('TransactionEditor', () => {
 
     expect(screen.getByText('Enter an amount like 1,23,456.78')).toBeInTheDocument()
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('asks for money in the amount field when it can be corrected', () => {
+    renderEditor()
+
+    expect(screen.getByLabelText('Amount')).toBeEnabled()
+  })
+
+  it('opens with the category the movement is filed under', () => {
+    renderEditor({ transaction: filed(11) })
+
+    expect(screen.getByLabelText('Category (optional)')).toHaveValue('11')
+  })
+
+  it('files a movement under a category, or unfiles it, and only when that changed', () => {
+    const onSave = renderEditor()
+
+    fireEvent.change(screen.getByLabelText('Category (optional)'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(onSave).toHaveBeenCalledWith({ category_id: 10 })
+  })
+
+  it('unfiles a movement with an explicit null', () => {
+    const onSave = renderEditor({ transaction: filed(11) })
+
+    fireEvent.change(screen.getByLabelText('Category (optional)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(onSave).toHaveBeenCalledWith({ category_id: null })
+  })
+
+  it('shows a split’s parts but offers no picker for them', () => {
+    renderEditor({ transaction: SPLIT })
+
+    expect(screen.getByLabelText('Amount')).toHaveValue('₹500.00')
+    expect(screen.queryByLabelText('Category (optional)')).not.toBeInTheDocument()
+    expect(screen.getByText(/its parts are the filing/)).toBeInTheDocument()
+    expect(screen.getByText(/^Filed under:/)).toBeInTheDocument()
+    expect(screen.getByText(/Food & groceries · Groceries/)).toBeInTheDocument()
+  })
+
+  it('says a transfer is filed under nothing', () => {
+    renderEditor({ transaction: TRANSFER })
+
+    expect(screen.queryByLabelText('Category (optional)')).not.toBeInTheDocument()
+    expect(screen.getByText(/moves money without spending it/)).toBeInTheDocument()
   })
 
   it('shows a two-sided amount but will not let it be changed', () => {
