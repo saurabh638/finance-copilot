@@ -462,6 +462,154 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/recurring-items': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Index
+     * @description Every live item, paused ones included.
+     */
+    get: operations['index_api_v1_recurring_items_get']
+    put?: never
+    /**
+     * Create
+     * @description Plan something that repeats.
+     */
+    post: operations['create_api_v1_recurring_items_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recurring-items/due': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Due
+     * @description What is owed on a day: the active items, on their day, not yet settled.
+     */
+    get: operations['due_api_v1_recurring_items_due_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recurring-items/{item_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Remove
+     * @description Remove an item. The periods it already dealt with keep their record.
+     */
+    delete: operations['remove_api_v1_recurring_items__item_id__delete']
+    options?: never
+    head?: never
+    /**
+     * Update
+     * @description Change an item's plan, never the money it has already recorded.
+     */
+    patch: operations['update_api_v1_recurring_items__item_id__patch']
+    trace?: never
+  }
+  '/api/v1/recurring-items/{item_id}/pause': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Pause
+     * @description Stop offering this item. Nothing owed is recorded.
+     */
+    post: operations['pause_api_v1_recurring_items__item_id__pause_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recurring-items/{item_id}/resume': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Resume
+     * @description Start offering this item again.
+     */
+    post: operations['resume_api_v1_recurring_items__item_id__resume_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recurring-items/{item_id}/confirm': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Confirm
+     * @description Record this period's money, as one movement dated the day it was owed.
+     */
+    post: operations['confirm_api_v1_recurring_items__item_id__confirm_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/recurring-items/{item_id}/skip': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Skip
+     * @description Say this period is not happening. Nothing is recorded at all.
+     */
+    post: operations['skip_api_v1_recurring_items__item_id__skip_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -749,12 +897,50 @@ export interface components {
       parent_id?: number | null
     }
     /**
+     * ConfirmRequest
+     * @description Confirming a period, optionally for a different amount this time.
+     */
+    ConfirmRequest: {
+      /** Amount Paise */
+      amount_paise?: number | null
+    }
+    /**
+     * ConfirmedResponse
+     * @description What confirming wrote: the item, the day, and the movement that recorded it.
+     */
+    ConfirmedResponse: {
+      item: components['schemas']['RecurringItemResponse']
+      /**
+       * Due On
+       * Format: date
+       */
+      due_on: string
+      /** Transaction Id */
+      transaction_id: number
+    }
+    /**
      * DefaultsResponse
      * @description What the default set added, which is nothing when the tree was not empty.
      */
     DefaultsResponse: {
       /** Created */
       created: components['schemas']['CategoryResponse'][]
+    }
+    /**
+     * DueItemResponse
+     * @description An item and the day it is owed for.
+     *
+     *     The day comes out with the item because it is not always today: a rent due on
+     *     the 1st that is confirmed on the 28th is still the 1st's rent, and the row
+     *     that gets written has to say so.
+     */
+    DueItemResponse: {
+      item: components['schemas']['RecurringItemResponse']
+      /**
+       * Due On
+       * Format: date
+       */
+      due_on: string
     }
     /**
      * ExpenseCreate
@@ -918,6 +1104,105 @@ export interface components {
      * @enum {string}
      */
     RateFrequency: 'daily' | 'monthly' | 'quarterly' | 'yearly'
+    /**
+     * RecurringFrequency
+     * @description How often a recurring item comes round.
+     *
+     *     A monthly item names a day of the month; a weekly one names a weekday. The
+     *     values match `app.core.recurrence.Frequency` word for word, so the calendar
+     *     code reads a stored row without a translation table in between.
+     * @enum {string}
+     */
+    RecurringFrequency: 'monthly' | 'weekly'
+    /**
+     * RecurringItemCreate
+     * @description A new repeating item.
+     *
+     *     The rhythm is given whole with its frequency: a monthly item carries a day of
+     *     the month, a weekly one a weekday, and the service refuses one that is half
+     *     given rather than guessing which half was meant.
+     */
+    RecurringItemCreate: {
+      /** Name */
+      name: string
+      kind: components['schemas']['PostingKind']
+      /** Amount Paise */
+      amount_paise: number
+      /** Account Id */
+      account_id: number
+      frequency: components['schemas']['RecurringFrequency']
+      /**
+       * Starts On
+       * Format: date
+       */
+      starts_on: string
+      /** Day Of Month */
+      day_of_month?: number | null
+      /** Weekday */
+      weekday?: number | null
+      /** Category Id */
+      category_id?: number | null
+      /** Ends On */
+      ends_on?: string | null
+    }
+    /**
+     * RecurringItemResponse
+     * @description One item as it is kept.
+     */
+    RecurringItemResponse: {
+      /** Id */
+      id: number
+      /** Name */
+      name: string
+      kind: components['schemas']['PostingKind']
+      /** Amount Paise */
+      amount_paise: number
+      /** Account Id */
+      account_id: number
+      /** Category Id */
+      category_id: number | null
+      frequency: components['schemas']['RecurringFrequency']
+      /** Day Of Month */
+      day_of_month: number | null
+      /** Weekday */
+      weekday: number | null
+      /**
+       * Starts On
+       * Format: date
+       */
+      starts_on: string
+      /** Ends On */
+      ends_on: string | null
+      /** Is Active */
+      is_active: boolean
+    }
+    /**
+     * RecurringItemUpdate
+     * @description What may change. An omitted field is left alone.
+     *
+     *     `category_id: null` clears the filing, so the router asks whether the field
+     *     was sent rather than reading its value. `frequency` changes the rhythm and
+     *     brings its own day with it.
+     */
+    RecurringItemUpdate: {
+      /** Name */
+      name?: string | null
+      /** Amount Paise */
+      amount_paise?: number | null
+      /** Account Id */
+      account_id?: number | null
+      /** Category Id */
+      category_id?: number | null
+      frequency?: components['schemas']['RecurringFrequency'] | null
+      /** Day Of Month */
+      day_of_month?: number | null
+      /** Weekday */
+      weekday?: number | null
+      /** Starts On */
+      starts_on?: string | null
+      /** Ends On */
+      ends_on?: string | null
+    }
     /**
      * SpendReportResponse
      * @description A period's spending: the tree, the money in no category, and the whole.
@@ -2138,6 +2423,373 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['DefaultsResponse']
+        }
+      }
+    }
+  }
+  index_api_v1_recurring_items_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecurringItemResponse'][]
+        }
+      }
+    }
+  }
+  create_api_v1_recurring_items_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RecurringItemCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecurringItemResponse']
+        }
+      }
+      /** @description A rule the database holds was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description An account or category does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  due_api_v1_recurring_items_due_get: {
+    parameters: {
+      query?: {
+        /** @description The day to ask about; today if omitted */
+        on?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DueItemResponse'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  remove_api_v1_recurring_items__item_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        item_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The item does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_api_v1_recurring_items__item_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        item_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RecurringItemUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecurringItemResponse']
+        }
+      }
+      /** @description A rule the database holds was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The item does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  pause_api_v1_recurring_items__item_id__pause_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        item_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecurringItemResponse']
+        }
+      }
+      /** @description The item does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  resume_api_v1_recurring_items__item_id__resume_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        item_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RecurringItemResponse']
+        }
+      }
+      /** @description The item does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  confirm_api_v1_recurring_items__item_id__confirm_post: {
+    parameters: {
+      query?: {
+        /** @description The day to ask about; today if omitted */
+        on?: string | null
+      }
+      header?: never
+      path: {
+        item_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ConfirmRequest'] | null
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ConfirmedResponse']
+        }
+      }
+      /** @description A rule the database holds was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The item does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The period is already settled */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  skip_api_v1_recurring_items__item_id__skip_post: {
+    parameters: {
+      query?: {
+        /** @description The day to ask about; today if omitted */
+        on?: string | null
+      }
+      header?: never
+      path: {
+        item_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DueItemResponse']
+        }
+      }
+      /** @description The item does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The period is already settled */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }
