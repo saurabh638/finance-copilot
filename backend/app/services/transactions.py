@@ -297,6 +297,34 @@ def record_adjustment(
     )
 
 
+def record_interest(
+    db: DbSession,
+    user_id: int,
+    account_id: int,
+    amount_paise: int,
+    on: date,
+    note: str | None = None,
+) -> Transaction:
+    """Credit interest to an account. Give the amount as a positive number.
+
+    Interest is money arriving that is not earning: the kind says so, which keeps
+    it out of the spending report and out of the categories, and the amount is
+    always positive because a bank does not charge interest with this kind. An
+    overdrawn account accrues nothing rather than a negative credit.
+    """
+    _require_positive(amount_paise)
+    account = get_account(db, user_id, account_id)
+    require_on_or_after_opening(account, on)
+
+    return _record(
+        db,
+        user_id,
+        on,
+        [Movement(account.id, amount_paise, PostingKind.INTEREST)],
+        note=note,
+    )
+
+
 def get_transaction(db: DbSession, user_id: int, transaction_id: int) -> Transaction:
     """Return one live transaction, or raise TransactionNotFoundError."""
     transaction = db.scalars(
