@@ -44,6 +44,11 @@ warn_unreachable = true
 module = "app.core.*"
 strict = true
 
+[[tool.mypy.overrides]]
+# APScheduler ships no type information, and the one job it runs is our own code.
+module = ["apscheduler.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=app --cov-report=term-missing --cov-fail-under=80"

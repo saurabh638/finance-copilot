@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # A write-off larger than this is worth a second look first. It is never
     # refused, only questioned, so this is a nudge rather than a limit.
     balance_check_warning_paise: int = Field(default=1_00_000, ge=0)
+    # The daily interest job. Off in tests, so a suite never gains a second writer.
+    scheduler_enabled: bool = True
     admin_email: str | None = None
     admin_password: str | None = None
 

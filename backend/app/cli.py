@@ -7,6 +7,7 @@ Run inside the container, for example:
     docker compose exec backend python -m app.cli seed --demo
     docker compose exec backend python -m app.cli seed --remove-demo
     docker compose exec backend python -m app.cli seed-categories
+    docker compose exec backend python -m app.cli accrue
 
 Credentials are read from the environment (ADMIN_EMAIL, ADMIN_PASSWORD) so a
 password never lands in shell history or the process list.
@@ -19,6 +20,7 @@ from datetime import date
 from app.config import get_settings
 from app.core.money import InvalidMoneyError
 from app.db import SessionLocal
+from app.jobs.scheduler import accrue_all
 from app.services.auth import EmailAlreadyUsedError, create_user, find_user
 from app.services.categories import seed_defaults
 from app.services.seeding import (
@@ -148,12 +150,36 @@ def _report(result: SeedResult) -> None:
         print("Nothing to create.")
 
 
+def _accrue(through: str | None) -> int:
+    """Work out interest for every account that has a rate.
+
+    The same call the daily job makes, so it can be run by hand: useful on the day
+    the rate is first recorded, and useful for seeing what the engine thinks before
+    a bank statement arrives.
+    """
+    day = None if through is None else date.fromisoformat(through)
+    made = accrue_all(through=day)
+
+    if made == 0:
+        print("Nothing new to work out.")
+    else:
+        print(f"Worked out {made} period(s) of interest, waiting to be confirmed.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for ``python -m app.cli``."""
     parser = argparse.ArgumentParser(prog="app.cli", description="Finance Co-pilot tasks.")
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("create-user", help="Create the single user.")
     subcommands.add_parser("seed-categories", help="Create the default category tree, once.")
+
+    accrue = subcommands.add_parser("accrue", help="Work out interest, as the daily job does.")
+    accrue.add_argument(
+        "--through",
+        default=None,
+        help="Work out every period that has finished by this day (YYYY-MM-DD).",
+    )
 
     seed = subcommands.add_parser("seed", help="Create the six real accounts.")
     seed.add_argument(
@@ -175,6 +201,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "seed-categories":
         return _seed_categories()
+
+    if args.command == "accrue":
+        return _accrue(args.through)
 
     try:
         return _seed(demo=args.demo, remove_placeholders=args.remove_placeholders)
