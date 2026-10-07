@@ -14,6 +14,7 @@ from app.models.enums import (
     RecurringFrequency,
     TransactionSource,
 )
+from app.models.interest_credit import InterestCredit
 from app.models.interest_rate import InterestRate
 from app.models.login_failure import LoginFailure
 from app.models.posting import Posting
@@ -31,6 +32,7 @@ __all__ = [
     "CaptureMode",
     "Category",
     "CategoryKind",
+    "InterestCredit",
     "InterestRate",
     "LoginFailure",
     "OccurrenceState",

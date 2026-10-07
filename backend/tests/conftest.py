@@ -14,8 +14,9 @@ if TYPE_CHECKING:
 
 
 def pytest_configure() -> None:
-    """Point the app at the test database before any app module is imported."""
+    """Point the app at the test database, and keep the timer out of the suite."""
     os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+    os.environ["SCHEDULER_ENABLED"] = "false"
 
 
 @pytest.fixture
@@ -72,7 +73,7 @@ def _empty_tables() -> None:
             text(
                 "TRUNCATE TABLE sessions, users, login_failures, accounts, "
                 "interest_rates, transactions, postings, balance_checks, categories, "
-                "recurring_items, recurring_occurrences "
+                "recurring_items, recurring_occurrences, interest_credits "
                 "RESTART IDENTITY CASCADE"
             )
         )
