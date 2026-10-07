@@ -27,7 +27,8 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M10c The picker on the entry forms | done | The category tree offered as a flat `Branch · Child` picker on the recording form, splits between categories with the parts having to add up exactly, and the filing shown and changed on the edit screen. Approved. |
 | M10d The categories page and the spend view | done | A third tab: the tree editable in place — add, rename, move, remove, with the server's own refusals — and the period's spending by branch, with the money in no category reported beside it. M10 is complete. Approved. |
 | M11 Daily check-in screen | done | The screen that opens the app: the run of days, the amount first, chips built from history, *same as yesterday*, *repeat last*, a catch-up for missed days, and what today holds. Approved. |
-| M12 Recurring and scheduled items | not started | |
+| M12a Recurring items, and the days they fall due | done | The plan, the pure calendar arithmetic, the confirm/skip service and the endpoints under `/api/v1/recurring-items`. Approved. |
+| M12b The repeats screen and the check-in's due rows | not started | Planned in outline with M12a |
 | M13 Interest accrual engine | not started | |
 | M14 Quick text entry | not started | |
 | Phase 0 gate (two weeks of real use) | not started | |
@@ -40,11 +41,11 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M11 is done**, and **the two-week Phase 0 gate is next**: the app is used on manual entry, the ledger has to
-stay current, a check-in has to take under a minute, and write-offs have to stay under 5% of spending.
-The gate needs the twelve figures only the user can give (`docker compose exec -T backend python -m app.cli
-seed`), and then real use — nothing else blocks it. After that, M12 (recurring and scheduled items) is the
-next build.
+**M12a is done**: repeating money exists as a plan, is owed on the right day, and can be confirmed
+through the API. **M12b — the repeats screen, and the due rows on the Today screen — is next**, and
+beyond it the **two-week Phase 0 gate**: the app used on manual entry, the ledger staying current, a
+check-in under a minute, and write-offs under 5% of spending. The gate needs the twelve figures only the
+user can give (`docker compose exec -T backend python -m app.cli seed`), and then real use.
 
 Before the app holds real data:
 
@@ -78,6 +79,10 @@ Before the app holds real data:
   category (it was filed under *Groceries*, then refiled to *Eating out*, then cleared, which is the
   clearing path) and a ₹500 shop split between *Groceries* and *Eating out*. Useful for looking at
   M10d's screens alongside the category tree.
+- The M12a walkthrough planned a *Smoke check* item on the *Walkthrough* account (₹100.00 monthly on the
+  6th), checked what was owed on the 5th and the 6th, confirmed it, saw the second confirmation refused,
+  paused it, then removed the movement and the item. Two soft-deleted rows are left behind and neither is
+  visible anywhere: the movement is out of every list, and the spend view counts it as nothing.
 
 ## Open questions
 
@@ -148,3 +153,20 @@ Before the app holds real data:
 - The spend report reads every matching posting and adds the figures up in Python, which is what keeps
   money out of the database's arithmetic. One household's month is a few hundred rows; a decade of import
   would want a grouped query, and that is a decision to make then, not now.
+- A recurring item is offered for the period being asked about only. A rent missed in August is not
+  offered in September; the catch-up covers older gaps. Walking back through every missed period since the
+  item's start is a different and larger screen.
+- An item's `ends_on` can be set through the API but not cleared; pausing or removing covers stopping one.
+- EMI and SIP have no `investment` kind to record against, so both are planned as spending for now.
+- A confirmation writes the movement first and the occurrence row second, and the movement's own write
+  commits. A crash in between would leave a movement with no occurrence row, so the period would be offered
+  again. Single user and a local database; making it one write means teaching the ledger to defer its
+  commit.
+- A skip cannot be undone through the API. Skipped the wrong period? Record the movement by hand on the
+  Transactions screen.
+- Two recurring items may share a name (no unique index), and a weekly item's weekday is a number until
+  M12b offers the weekday names.
+- Removing a confirmed movement brings its period back, and confirming again writes a second movement
+  while the removed one stays in the history. This is what keeps "the item is owed again" and "no
+  duplicates" both true; the alternative is refusing the second confirmation and making the user record it
+  by hand.
