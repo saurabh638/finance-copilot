@@ -29,7 +29,8 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M11 Daily check-in screen | done | The screen that opens the app: the run of days, the amount first, chips built from history, *same as yesterday*, *repeat last*, a catch-up for missed days, and what today holds. Approved. |
 | M12a Recurring items, and the days they fall due | done | The plan, the pure calendar arithmetic, the confirm/skip service and the endpoints under `/api/v1/recurring-items`. Approved. |
 | M12b The repeats screen and the check-in's due rows | done | The plan edited on a fifth tab, and what is owed today offered above the fields on the Today screen with one-tap confirmation, a different amount, or a skip. Approved. |
-| M13 Interest accrual engine | not started | |
+| M13a Interest accrual engine | done | `core/interest.py` with the stated day count and single rounding, `interest_credits`, the propose/confirm service and its endpoints, the in-process APScheduler job and an `accrue` command. Approved. |
+| M13b The interest panel | not started | Planned in outline with M13a |
 | M14 Quick text entry | not started | |
 | Phase 0 gate (two weeks of real use) | not started | |
 | M15 Import framework and SBI CSV | not started | |
@@ -41,11 +42,13 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M12 is complete**: repeating money is planned on the Repeats tab and confirmed from the Today screen in
-one tap. **The two-week Phase 0 gate is next**: the app used on manual entry, the ledger staying current, a
-check-in under a minute, and write-offs under 5% of spending. The gate needs the twelve figures only the
-user can give (`docker compose exec -T backend python -m app.cli seed`), and then real use. After that, M13
-(interest accrual) is the next build.
+**M13a is done**: dates and rates now produce interest, the engine proposes a finished period, and the user
+confirms the figure the bank paid — through the API and the `accrue` command, with the daily timer running in
+the backend. **M13b (the interest panel and interest as its own line on an account) is next**, and then
+**M14 (quick text entry)**, which completes Phase 0's build. **The two-week Phase 0 gate is still
+outstanding**: the app used on manual entry, the ledger staying current, a check-in under a minute, and
+write-offs under 5% of spending. The gate needs the twelve figures only the user can give
+(`docker compose exec -T backend python -m app.cli seed`), and then real use.
 
 Before the app holds real data:
 
@@ -90,6 +93,12 @@ Before the app holds real data:
   plan, *Gym* ₹1,500.00, was skipped (*Not this time*) and then removed, so it wrote nothing and is gone.
   **October now reads ₹26,100.00 spent**: ₹19,050.00 under *Home* (Rent ₹18,000.00 and Internet & phone
   ₹1,050.00), ₹1,300.00 under *Food & groceries*, and ₹5,750.00 filed under nothing.
+- The M13a walkthrough gave the *Walkthrough* account a rate (7.1% a year, monthly, from 1 October 2026)
+  and ran `accrue --through 2026-10-31`, which produced **one** proposal of ₹581.39 for the month — five
+  proposals, one per movement, before the engine was corrected. The figure was checked against an
+  independent day-by-day calculation and agreed to the paise. It was then confirmed at the bank's figure
+  of ₹581.50, so the account now carries one `interest` posting dated 31 October, its balance rose by
+  ₹581.50, and **October's spending is unchanged at ₹26,100.00** because interest is not spending.
 
 ## Open questions
 
@@ -114,6 +123,27 @@ Before the app holds real data:
   adjustment a check points at, or mark it as belonging to a check. Not built in M9b.
 - The share is per account. The Phase 0 gate's "write-offs under 5% of spending" wants one figure across
   every account, which needs its own endpoint.
+- **The day-count convention (actual days over a fixed 365) is only confirmed by a bank.** A bank that
+  divides by 366 differs by one day's interest, and the only way to know is a real credited figure. The
+  proposal and the credited figure are both stored, so the difference is visible rather than hidden.
+- A rate record added with a start date in the past is **not backfilled**: the engine works forward from
+  the last period it stored. Recovering earlier months needs a deliberate re-propose, which is not built.
+- The first period is clipped to the day the rate starts rather than skipped, so no day is lost — a rate
+  arriving on the 15th credits the 15th to the month's end.
+- Interest is credited only on a **positive** balance. An overdrawn account earns nothing, which is a
+  decision rather than a bank's behaviour being modelled.
+- A **yearly** rate is refused with a 400 carrying the reason, rather than quietly proposing nothing. The
+  rate model allows the value; the engine has no period for it.
+- A confirmed credit is recorded with `source = manual`, because the source enum's values describe how a
+  movement *arrived* and this one arrived by the user confirming it. A dedicated source would be tidier.
+- Interest is worked out per account, and a pot is an account: a pot's own rate accrues on the pot's own
+  balance, and its parent never sees that money. That is what stops double counting, and it also means a
+  pot's interest is invisible in the parent's total until the two are added up.
+- The daily timer has **no line in the logs** to confirm it started. Logging is not used anywhere in the
+  backend yet, so the start/stop path is proven by a test that starts the real scheduler instead.
+- `interest_credits` holds one row per run of days under one rate, so a rate change mid-month is two
+  proposals to confirm rather than one. Two figures to type is the honest cost of showing which rate
+  produced which money.
 - A write-off is now filed under `Unaccounted for spending` or `Unrecorded income`, by the sign of its
   difference. Renaming or removing those two names leaves a write-off unfiled, silently: it is the user's
   tree, and the check is recorded either way, but nothing says the filing has gone. Proposed: a line in
