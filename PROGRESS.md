@@ -28,7 +28,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M10d The categories page and the spend view | done | A third tab: the tree editable in place — add, rename, move, remove, with the server's own refusals — and the period's spending by branch, with the money in no category reported beside it. M10 is complete. Approved. |
 | M11 Daily check-in screen | done | The screen that opens the app: the run of days, the amount first, chips built from history, *same as yesterday*, *repeat last*, a catch-up for missed days, and what today holds. Approved. |
 | M12a Recurring items, and the days they fall due | done | The plan, the pure calendar arithmetic, the confirm/skip service and the endpoints under `/api/v1/recurring-items`. Approved. |
-| M12b The repeats screen and the check-in's due rows | not started | Planned in outline with M12a |
+| M12b The repeats screen and the check-in's due rows | done | The plan edited on a fifth tab, and what is owed today offered above the fields on the Today screen with one-tap confirmation, a different amount, or a skip. Approved. |
 | M13 Interest accrual engine | not started | |
 | M14 Quick text entry | not started | |
 | Phase 0 gate (two weeks of real use) | not started | |
@@ -41,11 +41,11 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M12a is done**: repeating money exists as a plan, is owed on the right day, and can be confirmed
-through the API. **M12b — the repeats screen, and the due rows on the Today screen — is next**, and
-beyond it the **two-week Phase 0 gate**: the app used on manual entry, the ledger staying current, a
+**M12 is complete**: repeating money is planned on the Repeats tab and confirmed from the Today screen in
+one tap. **The two-week Phase 0 gate is next**: the app used on manual entry, the ledger staying current, a
 check-in under a minute, and write-offs under 5% of spending. The gate needs the twelve figures only the
-user can give (`docker compose exec -T backend python -m app.cli seed`), and then real use.
+user can give (`docker compose exec -T backend python -m app.cli seed`), and then real use. After that, M13
+(interest accrual) is the next build.
 
 Before the app holds real data:
 
@@ -83,6 +83,13 @@ Before the app holds real data:
   6th), checked what was owed on the 5th and the 6th, confirmed it, saw the second confirmation refused,
   paused it, then removed the movement and the item. Two soft-deleted rows are left behind and neither is
   visible anywhere: the movement is out of every list, and the spend view counts it as nothing.
+- The M12b walkthrough left two live plans and the two movements they recorded, both on **SBI**: *Rent*
+  ₹18,000.00 every month on the 1st, filed under *Home · Rent* (confirmed on the 7th but dated 1 October,
+  which is the day it was owed), and *Broadband* ₹999.00 every month on the 7th, filed under *Home ·
+  Internet & phone* — confirmed as ₹1,050.00 for that month only while the plan kept its ₹999.00. A third
+  plan, *Gym* ₹1,500.00, was skipped (*Not this time*) and then removed, so it wrote nothing and is gone.
+  **October now reads ₹26,100.00 spent**: ₹19,050.00 under *Home* (Rent ₹18,000.00 and Internet & phone
+  ₹1,050.00), ₹1,300.00 under *Food & groceries*, and ₹5,750.00 filed under nothing.
 
 ## Open questions
 
@@ -170,3 +177,19 @@ Before the app holds real data:
   while the removed one stays in the history. This is what keeps "the item is owed again" and "no
   duplicates" both true; the alternative is refusing the second confirmation and making the user record it
   by hand.
+- The repeats list describes the rhythm in words ("every month on the 5th") and promises no next date: no
+  endpoint answers "when is this next due" for a day other than the one asked about. If real use wants a
+  date, that is a small server change.
+- A refused change to a plan closes the row's editor and shows the reason on the row; the values come back
+  from the server when it is opened again. Keeping the editor open with what was typed would need every
+  row action to report success back to the row.
+- A plan's direction cannot be changed and its end date cannot be cleared, because the API refuses both:
+  the money already recorded was spent or received, and an end date that could be emptied would make
+  "stopped for now" and "ends today" the same thing. The row shows the direction and the start date as
+  text for the same reason.
+- There is no "every other week" or yearly rhythm, and no way to skip a period other than the current one:
+  monthly and weekly on the day it lands are what M12 asked for.
+- The app now has five tabs. A sixth screen will need a different shape, and the honest candidates are
+  grouping the two settings screens (Accounts and Categories) or moving Repeats behind a link from Today.
+- The plan form and the row's editor are two field sets rather than one shared component. The rules behind
+  them (`validateItem`, `itemPayload`, `updatePayload`) are shared, but a new field means touching both.
