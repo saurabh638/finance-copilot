@@ -62,8 +62,11 @@ export function useStreak() {
  * corrected or removed: both caches are dropped together. The spending report is
  * derived from the same postings, so it goes with them, and so do the suggestions
  * and the streak, which are the history itself.
+ *
+ * Public because confirming a recurring item writes a movement, so the screens
+ * that do that have to drop exactly these caches and no others.
  */
-function useMovementsChanged(): () => void {
+export function useMovementsChanged(): () => void {
   const queryClient = useQueryClient()
 
   return () => {
