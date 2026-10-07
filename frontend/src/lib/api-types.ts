@@ -610,6 +610,86 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/accounts/{account_id}/interest': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Show
+     * @description What this account has been credited, and what is waiting to be.
+     */
+    get: operations['show_api_v1_accounts__account_id__interest_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/accounts/{account_id}/interest/propose': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Propose
+     * @description Work out every period that has finished, up to a day. Running it twice is safe.
+     */
+    post: operations['propose_api_v1_accounts__account_id__interest_propose_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/accounts/{account_id}/interest/{credit_id}/confirm': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Confirm
+     * @description Credit a period, for the figure the bank paid.
+     */
+    post: operations['confirm_api_v1_accounts__account_id__interest__credit_id__confirm_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/accounts/{account_id}/interest/{credit_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Drop
+     * @description Throw a proposal away. A credited period is removed by removing its movement.
+     */
+    delete: operations['drop_api_v1_accounts__account_id__interest__credit_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -643,6 +723,20 @@ export interface components {
        * @default true
        */
       is_active: boolean
+    }
+    /**
+     * AccountInterestResponse
+     * @description An account's interest: what is credited, and what is waiting to be.
+     */
+    AccountInterestResponse: {
+      /** Credited Paise */
+      credited_paise: number
+      /** Uncredited Paise */
+      uncredited_paise: number
+      /** Proposals */
+      proposals: components['schemas']['InterestCreditResponse'][]
+      /** History */
+      history: components['schemas']['InterestCreditResponse'][]
     }
     /**
      * AccountResponse
@@ -897,14 +991,6 @@ export interface components {
       parent_id?: number | null
     }
     /**
-     * ConfirmRequest
-     * @description Confirming a period, optionally for a different amount this time.
-     */
-    ConfirmRequest: {
-      /** Amount Paise */
-      amount_paise?: number | null
-    }
-    /**
      * ConfirmedResponse
      * @description What confirming wrote: the item, the day, and the movement that recorded it.
      */
@@ -1014,6 +1100,40 @@ export interface components {
       kind: 'income'
     }
     /**
+     * InterestCreditResponse
+     * @description One period of interest, proposed or credited.
+     *
+     *     Both figures come back: `computed_paise` is what the ledger's arithmetic said
+     *     and `credited_paise` is what the bank paid. A client that shows both is showing
+     *     where the stated day-count convention differs from the bank's.
+     */
+    InterestCreditResponse: {
+      /** Id */
+      id: number
+      /** Account Id */
+      account_id: number
+      /**
+       * Period Start
+       * Format: date
+       */
+      period_start: string
+      /**
+       * Period End
+       * Format: date
+       */
+      period_end: string
+      /** Rate Percent */
+      rate_percent: string
+      /** Computed Paise */
+      computed_paise: number
+      /** Credited Paise */
+      credited_paise: number | null
+      /** Transaction Id */
+      transaction_id: number | null
+      /** Confirmed On */
+      confirmed_on: string | null
+    }
+    /**
      * InterestRateCreate
      * @description Fields accepted when recording a rate. A change is a new record, never an edit.
      */
@@ -1097,6 +1217,14 @@ export interface components {
       kind: components['schemas']['PostingKind']
       /** Category Id */
       category_id: number | null
+    }
+    /**
+     * ProposeRequest
+     * @description Working out interest up to a day. An omitted day means today.
+     */
+    ProposeRequest: {
+      /** Through */
+      through?: string | null
     }
     /**
      * RateFrequency
@@ -1361,6 +1489,28 @@ export interface components {
       input?: unknown
       /** Context */
       ctx?: Record<string, never>
+    }
+    /**
+     * ConfirmRequest
+     * @description Confirming a period, for the figure the bank actually paid.
+     *
+     *     `credited_paise` is optional: without it the ledger's own figure is credited,
+     *     which is what the common case wants. `on` is the day the confirmation was made,
+     *     which is not the day the interest was paid — that is the period's last day.
+     */
+    app__schemas__interest__ConfirmRequest: {
+      /** On */
+      on?: string | null
+      /** Credited Paise */
+      credited_paise?: number | null
+    }
+    /**
+     * ConfirmRequest
+     * @description Confirming a period, optionally for a different amount this time.
+     */
+    app__schemas__recurring__ConfirmRequest: {
+      /** Amount Paise */
+      amount_paise?: number | null
     }
   }
   responses: never
@@ -2701,7 +2851,7 @@ export interface operations {
     }
     requestBody?: {
       content: {
-        'application/json': components['schemas']['ConfirmRequest'] | null
+        'application/json': components['schemas']['app__schemas__recurring__ConfirmRequest'] | null
       }
     }
     responses: {
@@ -2777,6 +2927,194 @@ export interface operations {
         content?: never
       }
       /** @description The period is already settled */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  show_api_v1_accounts__account_id__interest_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AccountInterestResponse']
+        }
+      }
+      /** @description The account does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  propose_api_v1_accounts__account_id__interest_propose_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ProposeRequest'] | null
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InterestCreditResponse'][]
+        }
+      }
+      /** @description Interest cannot be worked out */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The account does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  confirm_api_v1_accounts__account_id__interest__credit_id__confirm_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+        credit_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['app__schemas__interest__ConfirmRequest'] | null
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InterestCreditResponse']
+        }
+      }
+      /** @description A rule the database holds was broken */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The account or the period does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The period is already credited */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  drop_api_v1_accounts__account_id__interest__credit_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        account_id: number
+        credit_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The account or the period does not exist */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description The period is already credited */
       409: {
         headers: {
           [name: string]: unknown
