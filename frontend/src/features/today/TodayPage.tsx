@@ -21,6 +21,7 @@ import {
   useTransactions,
 } from '../transactions/useTransactions'
 import CatchUpForm from './CatchUpForm'
+import DueToday from './DueToday'
 import FastEntry from './FastEntry'
 import { streakWords } from './today'
 
@@ -83,6 +84,8 @@ export default function TodayPage({ today = todayIso() }: TodayPageProps) {
             {streakWords(streak.data.days, streak.data.today_recorded)}
           </p>
         )}
+
+        <DueToday accounts={accountList} today={today} />
 
         <FastEntry
           accounts={accountList}

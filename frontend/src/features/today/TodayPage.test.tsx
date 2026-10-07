@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchSession } from '../../lib/api'
 import { fetchAccounts } from '../accounts/api'
 import { fetchCategories } from '../categories/api'
+import { fetchDue } from '../recurring/api'
 import { fetchStreak, fetchSuggestions, fetchTransactions } from '../transactions/api'
 import type { Transaction } from '../transactions/api'
 import TodayPage from './TodayPage'
@@ -12,6 +13,7 @@ import TodayPage from './TodayPage'
 vi.mock('../../lib/api')
 vi.mock('../accounts/api')
 vi.mock('../categories/api')
+vi.mock('../recurring/api')
 vi.mock('../transactions/api')
 
 const USER = { id: 1, email: 'owner@example.com' }
@@ -46,6 +48,7 @@ beforeEach(() => {
   vi.mocked(fetchSuggestions).mockResolvedValue([])
   vi.mocked(fetchTransactions).mockResolvedValue([])
   vi.mocked(fetchStreak).mockResolvedValue({ days: 4, today_recorded: true })
+  vi.mocked(fetchDue).mockResolvedValue([])
   vi.mocked(fetchCategories).mockResolvedValue([
     { id: 10, name: 'Food & groceries', kind: 'expense', parent_id: null },
     { id: 11, name: 'Groceries', kind: 'expense', parent_id: 10 },
@@ -110,5 +113,41 @@ describe('TodayPage', () => {
     expect(
       screen.getByText(/Correcting or removing a movement happens on the Transactions/),
     ).toBeInTheDocument()
+  })
+
+  it('puts what is owed above the fields, because it is already known', async () => {
+    vi.mocked(fetchDue).mockResolvedValue([
+      {
+        item: {
+          id: 7,
+          name: 'Rent',
+          kind: 'expense',
+          amount_paise: 1_800_000,
+          account_id: 1,
+          category_id: null,
+          frequency: 'monthly',
+          day_of_month: 1,
+          weekday: null,
+          starts_on: '2026-04-01',
+          ends_on: null,
+          is_active: true,
+        },
+        due_on: '2026-10-01',
+      },
+    ])
+    renderPage()
+    await ready()
+
+    const owed = await screen.findByRole('heading', { name: 'Waiting to be recorded' })
+    const entries = screen.getByRole('heading', { name: 'Today’s entries' })
+
+    expect(owed.compareDocumentPosition(entries) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('gains no heading when nothing is owed', async () => {
+    renderPage()
+    await ready()
+
+    expect(screen.queryByRole('heading', { name: 'Waiting to be recorded' })).toBeNull()
   })
 })
