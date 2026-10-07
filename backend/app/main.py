@@ -1,9 +1,26 @@
 """FastAPI application factory and router registration."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 
 from app.api.deps import enforce_auth
-from app.api.v1 import accounts, auth, categories, health, recurring, transactions
+from app.api.v1 import accounts, auth, categories, health, interest, recurring, transactions
+from app.jobs.scheduler import shutdown_scheduler, start_scheduler
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    """Start the interest timer with the app, and stop it with the app.
+
+    The timer is what works interest out on a day nobody opens the app. It is part
+    of the process rather than a separate service because there is one job, and
+    because a job that shares the app's database settings is one thing to run.
+    """
+    start_scheduler()
+    yield
+    shutdown_scheduler()
 
 
 def create_app() -> FastAPI:
@@ -16,6 +33,7 @@ def create_app() -> FastAPI:
         title="Finance Co-pilot API",
         version="0.1.0",
         dependencies=[Depends(enforce_auth)],
+        lifespan=lifespan,
     )
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
@@ -23,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(transactions.router, prefix="/api/v1")
     app.include_router(categories.router, prefix="/api/v1")
     app.include_router(recurring.router, prefix="/api/v1")
+    app.include_router(interest.router, prefix="/api/v1")
     return app
 
 
