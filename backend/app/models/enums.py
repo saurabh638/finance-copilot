@@ -71,6 +71,29 @@ class TransactionSource(StrEnum):
     AI_APPROVED = "ai_approved"
 
 
+class RecurringFrequency(StrEnum):
+    """How often a recurring item comes round.
+
+    A monthly item names a day of the month; a weekly one names a weekday. The
+    values match `app.core.recurrence.Frequency` word for word, so the calendar
+    code reads a stored row without a translation table in between.
+    """
+
+    MONTHLY = "monthly"
+    WEEKLY = "weekly"
+
+
+class OccurrenceState(StrEnum):
+    """What happened to one period of a recurring item.
+
+    `confirmed` carries the transaction that recorded the money, and `skipped` is
+    a deliberate "not this period" that carries nothing at all.
+    """
+
+    CONFIRMED = "confirmed"
+    SKIPPED = "skipped"
+
+
 def enum_values(enum_class: type[Enum]) -> list[str]:
     """Persist the lower-case enum values rather than the member names."""
     return [str(member.value) for member in enum_class]
