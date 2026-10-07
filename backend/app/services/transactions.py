@@ -77,10 +77,14 @@ _CATEGORY_KINDS: dict[PostingKind, CategoryKind] = {
 }
 
 
-def _file_under(
+def file_under(
     db: DbSession, user_id: int, category_id: int | None, kind: PostingKind
 ) -> int | None:
-    """The category a posting goes under, refusing one that means something else."""
+    """The category a posting goes under, refusing one that means something else.
+
+    Public because a recurring item carries a category too, and the rule about
+    which kind of name may file what is one rule in one place.
+    """
     if category_id is None:
         return None
 
@@ -140,7 +144,7 @@ def _movements(
                 account_id,
                 direction * amount_paise,
                 kind,
-                _file_under(db, user_id, category_id, kind),
+                file_under(db, user_id, category_id, kind),
             )
         ]
 
@@ -158,7 +162,7 @@ def _movements(
             account_id,
             direction * part.amount_paise,
             kind,
-            _file_under(db, user_id, part.category_id, kind),
+            file_under(db, user_id, part.category_id, kind),
         )
         for part in parts
     ]
@@ -174,6 +178,7 @@ def record_expense(
     note: str | None = None,
     category_id: int | None = None,
     parts: Sequence[SplitPartCreate] | None = None,
+    source: TransactionSource = TransactionSource.MANUAL,
 ) -> Transaction:
     """Record money leaving an account. Give the amount as a positive number.
 
@@ -191,6 +196,7 @@ def record_expense(
         _movements(db, user_id, account.id, amount_paise, PostingKind.EXPENSE, category_id, parts),
         merchant=merchant,
         note=note,
+        source=source,
     )
 
 
@@ -204,6 +210,7 @@ def record_income(
     note: str | None = None,
     category_id: int | None = None,
     parts: Sequence[SplitPartCreate] | None = None,
+    source: TransactionSource = TransactionSource.MANUAL,
 ) -> Transaction:
     """Record money arriving. Give the amount as a positive number."""
     _require_positive(amount_paise)
@@ -217,6 +224,7 @@ def record_income(
         _movements(db, user_id, account.id, amount_paise, PostingKind.INCOME, category_id, parts),
         merchant=merchant,
         note=note,
+        source=source,
     )
 
 
@@ -344,6 +352,7 @@ def _record(
     *,
     merchant: str | None = None,
     note: str | None = None,
+    source: TransactionSource = TransactionSource.MANUAL,
 ) -> Transaction:
     """Write one transaction and its postings, as one piece.
 
@@ -361,7 +370,7 @@ def _record(
         transaction_date=on,
         merchant=merchant,
         note=note,
-        source=TransactionSource.MANUAL,
+        source=source,
     )
     db.add(transaction)
     db.flush()
@@ -627,7 +636,7 @@ def update_transaction(
             raise InvalidTransactionError(
                 "a category can only be changed for a transaction with one posting"
             )
-        postings[0].category_id = _file_under(db, user_id, changes.category_id, postings[0].kind)
+        postings[0].category_id = file_under(db, user_id, changes.category_id, postings[0].kind)
 
     db.commit()
     return transaction
