@@ -4,17 +4,19 @@ import AccountsPage from './features/accounts/AccountsPage'
 import LoginPage from './features/auth/LoginPage'
 import { useSession } from './features/auth/useSession'
 import CategoriesPage from './features/categories/CategoriesPage'
+import RecurringPage from './features/recurring/RecurringPage'
 import TodayPage from './features/today/TodayPage'
 import TransactionsPage from './features/transactions/TransactionsPage'
 
 /** The screens the signed-in app can show. */
-type Screen = 'today' | 'transactions' | 'accounts' | 'categories'
+type Screen = 'today' | 'transactions' | 'accounts' | 'categories' | 'repeats'
 
 const TABS: { id: Screen; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'accounts', label: 'Accounts' },
   { id: 'categories', label: 'Categories' },
+  { id: 'repeats', label: 'Repeats' },
 ]
 
 /** Show the login screen until there is a session, then the chosen screen. */
@@ -61,6 +63,7 @@ export default function App() {
       {screen === 'transactions' && <TransactionsPage />}
       {screen === 'accounts' && <AccountsPage />}
       {screen === 'categories' && <CategoriesPage />}
+      {screen === 'repeats' && <RecurringPage />}
     </>
   )
 }
