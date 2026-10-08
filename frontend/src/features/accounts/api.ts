@@ -21,6 +21,8 @@ export type CaptureMode = components['schemas']['CaptureMode']
 export type InterestRate = components['schemas']['InterestRateResponse']
 export type InterestRateCreate = components['schemas']['InterestRateCreate']
 export type RateFrequency = components['schemas']['RateFrequency']
+export type InterestCredit = components['schemas']['InterestCreditResponse']
+export type AccountInterest = components['schemas']['AccountInterestResponse']
 
 const ACCOUNTS_PATH = '/api/v1/accounts'
 
@@ -104,4 +106,47 @@ export function fetchAdjustmentShare(accountId: number, month: string): Promise<
   return requestJson<AdjustmentShare>(
     `${ACCOUNTS_PATH}/${accountId}/adjustment-share?month=${encodeURIComponent(month)}`,
   )
+}
+
+/** An account's interest: what is credited, and what is waiting to be. */
+export function fetchInterest(accountId: number): Promise<AccountInterest> {
+  return requestJson<AccountInterest>(`${ACCOUNTS_PATH}/${accountId}/interest`)
+}
+
+/**
+ * Work out every period that has finished, up to a day.
+ *
+ * The same call the daily job makes, so the screen does not have to wait for one
+ * in the morning to show what a rate has earned. Running it twice proposes
+ * nothing new.
+ */
+export function proposeInterest(accountId: number, through: string): Promise<InterestCredit[]> {
+  return requestJson<InterestCredit[]>(`${ACCOUNTS_PATH}/${accountId}/interest/propose`, {
+    method: 'POST',
+    body: JSON.stringify({ through }),
+  })
+}
+
+/**
+ * Credit a period, for the figure the bank paid.
+ *
+ * An omitted figure means the ledger's own, which is the common case. `on` is the
+ * day the confirmation was made; the money is dated the day the period ended.
+ */
+export function confirmInterest(
+  accountId: number,
+  creditId: number,
+  payload: { on: string; creditedPaise?: number },
+): Promise<InterestCredit> {
+  return requestJson<InterestCredit>(`${ACCOUNTS_PATH}/${accountId}/interest/${creditId}/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ on: payload.on, credited_paise: payload.creditedPaise ?? null }),
+  })
+}
+
+/** Throw a proposal away, because it should never have been worked out. */
+export function dropInterest(accountId: number, creditId: number): Promise<void> {
+  return requestNoContent(`${ACCOUNTS_PATH}/${accountId}/interest/${creditId}`, {
+    method: 'DELETE',
+  })
 }
