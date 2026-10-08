@@ -30,7 +30,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M12a Recurring items, and the days they fall due | done | The plan, the pure calendar arithmetic, the confirm/skip service and the endpoints under `/api/v1/recurring-items`. Approved. |
 | M12b The repeats screen and the check-in's due rows | done | The plan edited on a fifth tab, and what is owed today offered above the fields on the Today screen with one-tap confirmation, a different amount, or a skip. Approved. |
 | M13a Interest accrual engine | done | `core/interest.py` with the stated day count and single rounding, `interest_credits`, the propose/confirm service and its endpoints, the in-process APScheduler job and an `accrue` command. Approved. |
-| M13b The interest panel | not started | Planned in outline with M13a |
+| M13b The interest panel | done | A third panel on an account: what is credited and what is waiting, a bank figure to confirm against the ledger's, a period thrown away and worked out again, and interest as its own line under the balance. M13 is complete. Approved. |
 | M14 Quick text entry | not started | |
 | Phase 0 gate (two weeks of real use) | not started | |
 | M15 Import framework and SBI CSV | not started | |
@@ -42,13 +42,12 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 
 ## Current focus
 
-**M13a is done**: dates and rates now produce interest, the engine proposes a finished period, and the user
-confirms the figure the bank paid — through the API and the `accrue` command, with the daily timer running in
-the backend. **M13b (the interest panel and interest as its own line on an account) is next**, and then
-**M14 (quick text entry)**, which completes Phase 0's build. **The two-week Phase 0 gate is still
-outstanding**: the app used on manual entry, the ledger staying current, a check-in under a minute, and
-write-offs under 5% of spending. The gate needs the twelve figures only the user can give
-(`docker compose exec -T backend python -m app.cli seed`), and then real use.
+**M13 is complete**: rates produce interest, the engine proposes a finished period, and the screen settles it
+against what the bank actually paid — with the difference visible rather than smoothed over. **M14 (quick
+text entry) is the last build in Phase 0.** **The two-week Phase 0 gate is still outstanding**: the app used
+on manual entry, the ledger staying current, a check-in under a minute, and write-offs under 5% of spending.
+The gate needs the twelve figures only the user can give (`docker compose exec -T backend python -m app.cli
+seed`), and then real use.
 
 Before the app holds real data:
 
@@ -99,6 +98,13 @@ Before the app holds real data:
   independent day-by-day calculation and agreed to the paise. It was then confirmed at the bank's figure
   of ₹581.50, so the account now carries one `interest` posting dated 31 October, its balance rose by
   ₹581.50, and **October's spending is unchanged at ₹26,100.00** because interest is not spending.
+- The M13b walkthrough gave **SBI** a rate too (7.1% a year, monthly, from 1 September 2026) and used the
+  panel: *Work out what has finished* proposed September for ₹583.56, *Throw it away* asked first and
+  removed it, pressing the button again brought it straight back, and it was then confirmed at the bank's
+  ₹584.00. SBI's balance went from ₹1,25,450.00 to ₹1,26,034.00, its row now reads *of which interest
+  ₹584.00*, and the ledger holds one `interest` posting dated 30 September. **September's spending is ₹0**
+  and October's is unchanged. Two rates are therefore live in the development database (SBI and the
+  *Walkthrough* account), so the daily timer will propose October's interest for SBI on 1 November.
 
 ## Open questions
 
@@ -144,6 +150,22 @@ Before the app holds real data:
 - `interest_credits` holds one row per run of days under one rate, so a rate change mid-month is two
   proposals to confirm rather than one. Two figures to type is the honest cost of showing which rate
   produced which money.
+- The interest panel is per account: there is no "all interest" view, and the figure lives on the account
+  that earned it.
+- An account row now carries three toggles (Edit, Check balance, Interest). That is fine on a desktop and
+  wide on a phone; grouping the last two behind one control is the fix if it reads badly in use.
+- A credited period is undone by removing its movement on the Transactions screen. The panel says a
+  *proposal* can be thrown away but does not link to the ledger row that would undo a credit.
+- The panel shows the credits it is given (the API's default fifty) with no "show more", no total per year,
+  and no note of who last looked at a proposal. A decade of monthly credits would need pagination.
+- The bank-figure field forgets what was typed when the panel is closed, and a rate's crediting rhythm is
+  changed by adding a new rate record rather than from this panel, which does not say which rhythm is in
+  force.
+- `SpendView.test.tsx` (categories) failed once during a full frontend run and has passed every time since,
+  alone and in the suite. It is a flake in a test older than this milestone, whose cause is not yet known;
+  worth watching rather than papering over.
+- The app has no router, so a page reload returns to the Today tab rather than the screen being looked at.
+  That was decided in M8b and is felt most on the Accounts screen, where a reload now also closes a panel.
 - A write-off is now filed under `Unaccounted for spending` or `Unrecorded income`, by the sign of its
   difference. Renaming or removing those two names leaves a write-off unfiled, silently: it is the user's
   tree, and the check is recorded either way, but nothing says the filing has gone. Proposed: a line in
