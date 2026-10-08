@@ -49,12 +49,18 @@ SUGGESTION_DAYS = 90
 
 @dataclass(frozen=True)
 class BalanceBreakdown:
-    """A balance, and the two figures it was worked out from."""
+    """A balance, the figures it was worked out from, and the interest in them.
+
+    `interest_paise` is part of `postings_paise`, not a third part of the balance:
+    the credit it counts was posted like any other movement. Adding it again would
+    inflate the balance, so it is reported as a reading of the movements.
+    """
 
     account_id: int
     as_of: date | None
     opening_balance_paise: int
     postings_paise: int
+    interest_paise: int
     balance_paise: int
 
 
@@ -363,6 +369,7 @@ def balance(
         as_of=as_of,
         opening_balance_paise=account.opening_balance_paise,
         postings_paise=sum_paise(posting.amount_paise for posting in postings),
+        interest_paise=_interest_paise(db, account.id, as_of),
         balance_paise=balance_paise(
             account.opening_balance_paise,
             account.opening_date,
@@ -370,6 +377,19 @@ def balance(
             as_of,
         ),
     )
+
+
+def _interest_paise(db: DbSession, account_id: int, as_of: date | None) -> int:
+    """How much of an account's movements is interest the bank has paid.
+
+    Only `interest` postings count, so a write-off of the same size is not reported
+    as interest. The same liveness rules apply as everywhere else: a removed
+    credit stops counting.
+    """
+    rows = db.execute(
+        _dated_postings(account_id, as_of).where(Posting.kind == PostingKind.INTEREST)
+    ).all()
+    return sum_paise(row[1] for row in rows)
 
 
 def _record(

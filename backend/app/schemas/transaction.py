@@ -9,16 +9,20 @@ from app.models.enums import PostingKind, TransactionSource
 
 
 class BalanceResponse(BaseModel):
-    """An account's balance, and the two figures it was worked out from.
+    """An account's balance, the figures it was worked out from, and its interest.
 
     The parts are reported as well as the answer, so a figure can always be
     explained rather than merely trusted. Money is integer paise throughout.
+    `interest_paise` is part of `postings_paise` rather than another part of the
+    balance: it is a reading of the movements, so that a client can show how much
+    of what moved was interest without adding it twice.
     """
 
     account_id: int
     as_of: date | None
     opening_balance_paise: int
     postings_paise: int
+    interest_paise: int
     balance_paise: int
 
 

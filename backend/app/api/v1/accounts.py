@@ -134,7 +134,7 @@ def read_balance(
     user: User = Depends(get_current_user),
     as_of: date | None = None,
 ) -> BalanceResponse:
-    """The account's balance, and the two figures it was worked out from."""
+    """The account's balance, and the figures it was worked out from."""
     try:
         found = transactions.balance(db, user.id, account_id, as_of)
     except AccountNotFoundError as error:
@@ -145,6 +145,7 @@ def read_balance(
         as_of=found.as_of,
         opening_balance_paise=found.opening_balance_paise,
         postings_paise=found.postings_paise,
+        interest_paise=found.interest_paise,
         balance_paise=found.balance_paise,
     )
 

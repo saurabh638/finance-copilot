@@ -9,7 +9,12 @@ from app.models import AccountType, CaptureMode, User
 from app.schemas.account import AccountCreate
 from app.services.accounts import create_account, soft_delete_account
 from app.services.auth import create_user
-from app.services.transactions import record_expense, record_income
+from app.services.transactions import (
+    record_expense,
+    record_income,
+    record_interest,
+    soft_delete_transaction,
+)
 
 EMAIL = "owner@example.com"
 PASSPHRASE = "s3cret-passphrase"
@@ -59,6 +64,7 @@ def test_an_account_with_no_postings_holds_its_opening_balance(
         "as_of": None,
         "opening_balance_paise": OPENING_PAISE,
         "postings_paise": 0,
+        "interest_paise": 0,
         "balance_paise": OPENING_PAISE,
     }
 
@@ -100,6 +106,37 @@ def test_a_date_that_is_not_a_date_is_refused(client: TestClient, db: Session, u
     response = client.get(_balance_path(account_id), params={"as_of": "30-04-2026"})
 
     assert response.status_code == 422
+
+
+def test_the_balance_says_how_much_of_it_is_interest(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    record_expense(db, user.id, account_id, 500_00, date(2026, 4, 15))
+    record_interest(db, user.id, account_id, 581_50, date(2026, 4, 30))
+
+    body = client.get(_balance_path(account_id)).json()
+
+    # Interest is part of the movements, not a third part of the balance: the
+    # opening balance plus the movements still has to come to the balance.
+    assert body["postings_paise"] == -500_00 + 581_50
+    assert body["interest_paise"] == 581_50
+    assert body["balance_paise"] == OPENING_PAISE + body["postings_paise"]
+
+
+def test_interest_that_was_removed_is_no_longer_counted(
+    client: TestClient, db: Session, user: User
+) -> None:
+    _sign_in(client)
+    account_id = _account(db, user)
+    credited = record_interest(db, user.id, account_id, 581_50, date(2026, 4, 30))
+    soft_delete_transaction(db, user.id, credited.id)
+
+    body = client.get(_balance_path(account_id)).json()
+
+    assert body["interest_paise"] == 0
+    assert body["postings_paise"] == 0
 
 
 def test_an_unknown_account_is_not_found(client: TestClient, user: User) -> None:
