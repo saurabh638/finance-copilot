@@ -16,6 +16,7 @@ import {
   type MovementKind,
   type MovementProblems,
 } from '../transactions/form'
+import QuickEntry from './QuickEntry'
 import { filledBy, movementOn } from './today'
 
 interface FastEntryProps {
@@ -54,6 +55,8 @@ export default function FastEntry({
 }: FastEntryProps) {
   const [values, setValues] = useState<MovementFormValues>(() => blankMovement(today))
   const [problems, setProblems] = useState<MovementProblems>({})
+  /** Bumped when a movement is recorded, so the quick line starts again too. */
+  const [resetToken, setResetToken] = useState(0)
 
   function change<K extends keyof MovementFormValues>(
     field: K,
@@ -99,7 +102,19 @@ export default function FastEntry({
     if (Object.keys(found).length === 0) {
       onSubmit(toPayload(values))
       setValues(blankMovement(today))
+      setResetToken((current) => current + 1)
     }
+  }
+
+  /**
+   * The quick line read the movement out of a sentence.
+   *
+   * It fills this form rather than recording on its own, so there is still one
+   * payload path and one place to correct anything the reading got wrong.
+   */
+  function takeReading(next: MovementFormValues): void {
+    setValues(next)
+    setProblems({})
   }
 
   const accountOptions = ['', ...accounts.map((account) => String(account.id))]
@@ -136,6 +151,15 @@ export default function FastEntry({
           onChange={(value) => change('kind', value)}
         />
       </div>
+
+      <QuickEntry
+        accounts={accounts}
+        categories={categories}
+        suggestions={suggestions}
+        today={today}
+        onFill={takeReading}
+        resetToken={resetToken}
+      />
 
       {suggestions.length > 0 && (
         <fieldset className="border-0 p-0">
@@ -200,6 +224,16 @@ export default function FastEntry({
         value={values.merchant}
         error={problems.merchant}
         onChange={(value) => change('merchant', value)}
+      />
+
+      {/* The quick line can read a note out of a sentence, so the screen has to
+          show it: a reading that cannot be corrected is a reading to distrust. */}
+      <TextField
+        label="Note (optional)"
+        id="today-note"
+        value={values.note}
+        error={problems.note}
+        onChange={(value) => change('note', value)}
       />
 
       <button

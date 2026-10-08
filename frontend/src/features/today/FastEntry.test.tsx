@@ -9,6 +9,7 @@ import FastEntry from './FastEntry'
 const SBI: Account = {
   id: 1,
   name: 'SBI',
+  alias: null,
   type: 'savings',
   purpose: null,
   capture_mode: 'statement_import',
@@ -177,5 +178,52 @@ describe('FastEntry', () => {
 
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByText('Pick an account')).toBeInTheDocument()
+  })
+})
+
+describe('the quick line', () => {
+  it('fills the form from a sentence', () => {
+    renderEntry()
+
+    type('Say it in a line (optional)', '450 dinner blinkit sbi')
+
+    expect(screen.getByLabelText('Amount')).toHaveValue('450')
+    expect(screen.getByLabelText('Merchant (optional)')).toHaveValue('Blinkit')
+    expect(screen.getByLabelText('Note (optional)')).toHaveValue('dinner')
+    expect(screen.getByLabelText('Account')).toHaveValue('1')
+  })
+
+  it('records through the same payload path as the form', () => {
+    const onSubmit = renderEntry()
+
+    type('Say it in a line (optional)', '450 dinner blinkit sbi')
+    fireEvent.click(screen.getByRole('button', { name: 'Record it' }))
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      kind: 'expense',
+      account_id: 1,
+      amount_paise: 45_000,
+      transaction_date: '2026-10-06',
+      merchant: 'Blinkit',
+      note: 'dinner',
+    })
+  })
+
+  it('starts the line again once the movement is recorded', () => {
+    renderEntry()
+
+    type('Say it in a line (optional)', '450 blinkit sbi')
+    fireEvent.click(screen.getByRole('button', { name: 'Record it' }))
+
+    expect(screen.getByLabelText('Say it in a line (optional)')).toHaveValue('')
+  })
+
+  it('leaves the form alone while the line is empty', () => {
+    renderEntry()
+
+    type('Amount', '99')
+    type('Say it in a line (optional)', '')
+
+    expect(screen.getByLabelText('Amount')).toHaveValue('99')
   })
 })
