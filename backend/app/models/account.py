@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     String,
     text,
 )
@@ -41,11 +42,30 @@ class Account(TimestampMixin, Base):
             "due_day IS NULL OR due_day BETWEEN 1 AND 31",
             name="ck_accounts_due_day_range",
         ),
+        CheckConstraint(
+            "alias IS NULL OR (alias = btrim(alias) AND alias <> '')",
+            name="ck_accounts_alias_trimmed",
+        ),
+        # One live account per alias, compared without case so `HDFC` and `hdfc`
+        # cannot mean two accounts. Partial, so a soft-deleted account releases
+        # the word.
+        Index(
+            "uq_accounts_alias",
+            "user_id",
+            text("lower(alias)"),
+            unique=True,
+            postgresql_where=text("alias IS NOT NULL AND deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # A short word the account answers to when money is typed in a line, so `hdfc`
+    # can mean the credit card without renaming the account. Optional, and one
+    # word means one account: the service refuses a clash with another account's
+    # alias or name.
+    alias: Mapped[str | None] = mapped_column(String(40), nullable=True)
     type: Mapped[AccountType] = mapped_column(
         SqlEnum(
             AccountType,

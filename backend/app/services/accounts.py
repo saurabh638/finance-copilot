@@ -6,11 +6,15 @@ so the `deleted_at IS NULL` filter lives in exactly one place.
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.models import Account, AccountType
 from app.schemas.account import AccountCreate, AccountUpdate
+
+# Long enough for `sbi credit card`, short enough that it is a word rather than a
+# name. Mirrored by the column and by the schema.
+ALIAS_MAX_LENGTH = 40
 
 
 class AccountNotFoundError(LookupError):
@@ -49,8 +53,44 @@ def _validate_parent(db: DbSession, user_id: int, parent_id: int) -> None:
         raise InvalidAccountError("a pot cannot be the parent of another pot")
 
 
+def _clean_alias(alias: str | None) -> str | None:
+    """Trim an alias and treat an empty one as no alias at all."""
+    if alias is None:
+        return None
+    trimmed = alias.strip()
+    if not trimmed:
+        return None
+    if len(trimmed) > ALIAS_MAX_LENGTH:
+        raise InvalidAccountError(f"an alias may be at most {ALIAS_MAX_LENGTH} characters")
+    return trimmed
+
+
+def _validate_alias(
+    db: DbSession, user_id: int, *, alias: str | None, name: str, exclude_id: int | None = None
+) -> None:
+    """A word means one account: an alias may not be another account's alias or name.
+
+    A clash would make every typed line a question, so it is refused in words
+    rather than left to the screen to resolve. This runs *before* the change is
+    applied, so a clash is reported rather than tripping the unique index.
+    """
+    if alias is None:
+        return
+    wanted = alias.lower()
+    statement = _active_accounts(user_id).where(
+        (func.lower(Account.alias) == wanted) | (func.lower(Account.name) == wanted)
+    )
+    if exclude_id is not None:
+        statement = statement.where(Account.id != exclude_id)
+    clash = db.scalars(statement).first()
+    if clash is not None:
+        raise InvalidAccountError(f"{alias!r} already means {clash.name!r}; choose another alias")
+
+
 def _validate_state(account: Account) -> None:
     """Rules that depend on the final state of the account."""
+    if not account.name.strip():
+        raise InvalidAccountError("an account needs a name")
     if (account.type is AccountType.POT) != (account.parent_id is not None):
         raise InvalidAccountError("a pot needs a parent account, and only a pot may have one")
     if account.type is not AccountType.CREDIT_CARD and (
@@ -64,9 +104,13 @@ def create_account(db: DbSession, user_id: int, data: AccountCreate) -> Account:
     if data.parent_id is not None:
         _validate_parent(db, user_id, data.parent_id)
 
+    alias = _clean_alias(data.alias)
+    _validate_alias(db, user_id, alias=alias, name=data.name.strip())
+
     account = Account(
         user_id=user_id,
-        name=data.name,
+        name=data.name.strip(),
+        alias=alias,
         type=data.type,
         purpose=data.purpose,
         capture_mode=data.capture_mode,
@@ -92,8 +136,14 @@ def update_account(db: DbSession, user_id: int, account_id: int, data: AccountUp
     if new_parent_id is not None:
         _validate_parent(db, user_id, new_parent_id)
 
+    name = account.name if "name" not in changes else str(changes["name"]).strip()
+    alias = account.alias if "alias" not in changes else _clean_alias(changes["alias"])
+    _validate_alias(db, user_id, alias=alias, name=name, exclude_id=account.id)
+
     for field, value in changes.items():
         setattr(account, field, value)
+    account.name = name
+    account.alias = alias
 
     _validate_state(account)
     db.commit()

@@ -12,6 +12,7 @@ class AccountCreate(BaseModel):
     """Fields accepted when creating an account."""
 
     name: str = Field(min_length=1, max_length=100)
+    alias: str | None = Field(default=None, max_length=40)
     type: AccountType
     purpose: str | None = Field(default=None, max_length=100)
     capture_mode: CaptureMode
@@ -38,6 +39,7 @@ class AccountUpdate(BaseModel):
     """Fields that may change; omitted fields are left alone. `type` is fixed."""
 
     name: str | None = Field(default=None, min_length=1, max_length=100)
+    alias: str | None = Field(default=None, max_length=40)
     purpose: str | None = Field(default=None, max_length=100)
     capture_mode: CaptureMode | None = None
     parent_id: int | None = None
@@ -55,6 +57,7 @@ class AccountResponse(BaseModel):
 
     id: int
     name: str
+    alias: str | None
     type: AccountType
     purpose: str | None
     capture_mode: CaptureMode
