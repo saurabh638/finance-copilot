@@ -9,6 +9,7 @@ import RecurringRow from './RecurringRow'
 const SBI: Account = {
   id: 1,
   name: 'SBI',
+  alias: null,
   type: 'savings',
   purpose: null,
   capture_mode: 'statement_import',

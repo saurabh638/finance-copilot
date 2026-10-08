@@ -32,6 +32,7 @@ function account(id: number, name: string): Account {
   return {
     id,
     name,
+    alias: null,
     type: 'savings',
     purpose: null,
     capture_mode: 'statement_import',

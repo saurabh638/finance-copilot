@@ -47,6 +47,20 @@ export default function AccountFields({
         onChange={(value) => onChange('name', value)}
       />
 
+      <Field label="Alias (optional)" htmlFor="account-alias" error={errors.alias}>
+        <input
+          id="account-alias"
+          value={values.alias}
+          onChange={(event) => onChange('alias', event.target.value)}
+          aria-invalid={errors.alias !== undefined}
+          aria-describedby={errors.alias !== undefined ? 'account-alias-error' : undefined}
+          className={INPUT_CLASS}
+        />
+        <p className="text-sm text-slate-500">
+          A short word you can type instead of the name, like hdfc. One word means one account.
+        </p>
+      </Field>
+
       {isTypeEditable ? (
         <SelectField
           label="Type"

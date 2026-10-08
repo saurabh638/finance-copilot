@@ -25,6 +25,7 @@ const USER = { id: 1, email: 'owner@example.com' }
 const SAVINGS: Account = {
   id: 1,
   name: 'SBI',
+  alias: null,
   type: 'savings',
   purpose: null,
   capture_mode: 'statement_import',

@@ -14,6 +14,7 @@ const TODAY = '2026-10-07'
 const SBI: Account = {
   id: 1,
   name: 'SBI',
+  alias: null,
   type: 'savings',
   purpose: null,
   capture_mode: 'statement_import',

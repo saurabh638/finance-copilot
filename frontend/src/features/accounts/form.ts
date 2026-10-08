@@ -42,6 +42,7 @@ export const RATE_FREQUENCIES = Object.keys(RATE_FREQUENCY_LABELS) as RateFreque
 /** Every value is text: inputs hold text, and nothing is parsed until submit. */
 export interface AccountFormValues {
   name: string
+  alias: string
   type: AccountType
   capture_mode: CaptureMode
   purpose: string
@@ -56,6 +57,7 @@ export interface AccountFormValues {
 
 export const EMPTY_ACCOUNT_FORM: AccountFormValues = {
   name: '',
+  alias: '',
   type: 'savings',
   capture_mode: 'statement_import',
   purpose: '',
@@ -72,6 +74,15 @@ export type AccountFormErrors = Partial<Record<keyof AccountFormValues, string>>
 
 // Up to three digits before the point and four after: NUMERIC(7, 4) on the server.
 const RATE_PATTERN = /^\d{1,3}(\.\d{1,4})?$/
+
+// The alias column's width, mirrored so the form refuses what the server would.
+export const ALIAS_MAX_LENGTH = 40
+
+/** `hdfc`, or null when the box is empty: a blank word is not a word. */
+export function aliasOrNull(text: string): string | null {
+  const trimmed = text.trim()
+  return trimmed === '' ? null : trimmed
+}
 
 /** True when the text is a rate the server will accept. */
 export function isValidRateText(text: string): boolean {
@@ -90,6 +101,10 @@ export function validateAccountForm(values: AccountFormValues): AccountFormError
 
   if (values.purpose.trim().length > 100) {
     errors.purpose = 'Keep the purpose under 100 characters'
+  }
+
+  if (values.alias.trim().length > ALIAS_MAX_LENGTH) {
+    errors.alias = `Keep the alias under ${ALIAS_MAX_LENGTH} characters`
   }
 
   try {
@@ -130,6 +145,7 @@ export function toNewAccount(values: AccountFormValues): NewAccount {
   return {
     account: {
       name: values.name.trim(),
+      alias: aliasOrNull(values.alias),
       type: values.type,
       capture_mode: values.capture_mode,
       purpose: values.purpose.trim() === '' ? null : values.purpose.trim(),
@@ -164,6 +180,7 @@ function dayOrNull(text: string): number | null {
 export function accountToFormValues(account: Account): AccountFormValues {
   return {
     name: account.name,
+    alias: account.alias ?? '',
     type: account.type,
     capture_mode: account.capture_mode,
     purpose: account.purpose ?? '',
@@ -190,6 +207,7 @@ export function toAccountUpdate(values: AccountFormValues, isActive: boolean): A
 
   return {
     name: values.name.trim(),
+    alias: aliasOrNull(values.alias),
     purpose: values.purpose.trim() === '' ? null : values.purpose.trim(),
     capture_mode: values.capture_mode,
     parent_id: isPot ? Number(values.parent_id) : null,

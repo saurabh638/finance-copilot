@@ -47,6 +47,7 @@ beforeEach(() => {
     {
       id: 1,
       name: 'SBI',
+      alias: null,
       type: 'savings',
       purpose: null,
       capture_mode: 'statement_import',

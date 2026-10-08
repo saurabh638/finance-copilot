@@ -13,6 +13,7 @@ import {
 const SAVINGS: Account = {
   id: 1,
   name: 'SBI',
+  alias: 'hdfc',
   type: 'savings',
   purpose: 'salary',
   capture_mode: 'statement_import',
@@ -114,5 +115,40 @@ describe('toAccountUpdate', () => {
 describe('validateAccountForm', () => {
   it('accepts a complete account', () => {
     expect(validateAccountForm(FILLED)).toEqual({})
+  })
+})
+
+describe('the alias', () => {
+  it('starts blank, because an alias is optional', () => {
+    expect(EMPTY_ACCOUNT_FORM.alias).toBe('')
+  })
+
+  it('seeds the edit form from the account', () => {
+    expect(accountToFormValues(SAVINGS).alias).toBe('hdfc')
+  })
+
+  it('shows a blank box for an account that has no alias', () => {
+    expect(accountToFormValues({ ...SAVINGS, alias: null }).alias).toBe('')
+  })
+
+  it('goes over the wire trimmed', () => {
+    const values = { ...FILLED, alias: '  hdfc  ' }
+
+    expect(toNewAccount(values).account.alias).toBe('hdfc')
+    expect(toAccountUpdate(values, true).alias).toBe('hdfc')
+  })
+
+  it('sends no alias at all when the box is empty', () => {
+    const values = { ...FILLED, alias: '   ' }
+
+    expect(toNewAccount(values).account.alias).toBeNull()
+    expect(toAccountUpdate(values, true).alias).toBeNull()
+  })
+
+  it('refuses an alias longer than the server takes', () => {
+    expect(validateAccountForm({ ...FILLED, alias: 'x'.repeat(41) }).alias).toBe(
+      'Keep the alias under 40 characters',
+    )
+    expect(validateAccountForm({ ...FILLED, alias: 'x'.repeat(40) }).alias).toBeUndefined()
   })
 })

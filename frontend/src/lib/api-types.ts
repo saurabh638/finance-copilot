@@ -701,6 +701,8 @@ export interface components {
     AccountCreate: {
       /** Name */
       name: string
+      /** Alias */
+      alias?: string | null
       type: components['schemas']['AccountType']
       /** Purpose */
       purpose?: string | null
@@ -747,6 +749,8 @@ export interface components {
       id: number
       /** Name */
       name: string
+      /** Alias */
+      alias: string | null
       type: components['schemas']['AccountType']
       /** Purpose */
       purpose: string | null
@@ -791,6 +795,8 @@ export interface components {
     AccountUpdate: {
       /** Name */
       name?: string | null
+      /** Alias */
+      alias?: string | null
       /** Purpose */
       purpose?: string | null
       capture_mode?: components['schemas']['CaptureMode'] | null

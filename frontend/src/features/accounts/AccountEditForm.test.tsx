@@ -7,6 +7,7 @@ import AccountEditForm from './AccountEditForm'
 const SAVINGS: Account = {
   id: 1,
   name: 'SBI',
+  alias: null,
   type: 'savings',
   purpose: 'salary',
   capture_mode: 'statement_import',
