@@ -11,6 +11,7 @@ import {
   fetchAccounts,
   fetchAdjustmentShare,
   fetchBalance,
+  fetchInterest,
   fetchRates,
   updateAccount,
 } from './api'
@@ -67,7 +68,14 @@ describe('AccountsPage', () => {
       as_of: null,
       opening_balance_paise: 12_345_678,
       postings_paise: -50_000,
+      interest_paise: 0,
       balance_paise: 12_295_678,
+    })
+    vi.mocked(fetchInterest).mockResolvedValue({
+      credited_paise: 58_150,
+      uncredited_paise: 0,
+      proposals: [],
+      history: [],
     })
   })
 
@@ -90,6 +98,20 @@ describe('AccountsPage', () => {
     renderPage()
 
     expect(await screen.findByText(/No accounts yet/)).toBeInTheDocument()
+  })
+
+  it('opens the interest, says what is credited, and puts it away again', async () => {
+    renderPage()
+    await screen.findByText('SBI')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Interest' }))
+
+    // The panel reads the account's interest, and only when it is opened.
+    expect(await screen.findByText(/Credited so far/)).toHaveTextContent('Credited so far ₹581.50')
+    expect(vi.mocked(fetchInterest)).toHaveBeenCalledWith(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide interest' }))
+    expect(screen.queryByText(/Credited so far/)).toBeNull()
   })
 
   it('checks an account against the bank, and can put the check away', async () => {

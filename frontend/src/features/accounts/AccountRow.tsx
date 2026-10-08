@@ -12,7 +12,9 @@ interface AccountRowProps {
   onEdit: () => void
   isChecking: boolean
   onCheck: () => void
-  /** The editor or the balance check, rendered under the summary while open. */
+  isShowingInterest: boolean
+  onShowInterest: () => void
+  /** The editor, the balance check or the interest, under the summary while open. */
   children?: ReactNode
 }
 
@@ -24,6 +26,8 @@ export default function AccountRow({
   onEdit,
   isChecking,
   onCheck,
+  isShowingInterest,
+  onShowInterest,
   children,
 }: AccountRowProps) {
   return (
@@ -59,6 +63,13 @@ export default function AccountRow({
           className="min-h-11 rounded border border-slate-300 bg-white px-4 text-slate-900"
         >
           {isChecking ? 'Cancel check' : 'Check balance'}
+        </button>
+        <button
+          type="button"
+          onClick={onShowInterest}
+          className="min-h-11 rounded border border-slate-300 bg-white px-4 text-slate-900"
+        >
+          {isShowingInterest ? 'Hide interest' : 'Interest'}
         </button>
       </div>
 

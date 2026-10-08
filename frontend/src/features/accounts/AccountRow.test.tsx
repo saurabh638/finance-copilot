@@ -24,9 +24,16 @@ const SAVINGS: Account = {
   updated_at: '2026-04-01T00:00:00Z',
 }
 
-function renderRow(account: Account, parentName?: string, isEditing = false, isChecking = false) {
+function renderRow(
+  account: Account,
+  parentName?: string,
+  isEditing = false,
+  isChecking = false,
+  isShowingInterest = false,
+) {
   const onEdit = vi.fn()
   const onCheck = vi.fn()
+  const onShowInterest = vi.fn()
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
@@ -38,13 +45,16 @@ function renderRow(account: Account, parentName?: string, isEditing = false, isC
           onEdit={onEdit}
           isChecking={isChecking}
           onCheck={onCheck}
+          isShowingInterest={isShowingInterest}
+          onShowInterest={onShowInterest}
         >
           {isEditing && <p>editor</p>}
+          {isShowingInterest && <p>interest</p>}
         </AccountRow>
       </ul>
     </QueryClientProvider>,
   )
-  return onEdit
+  return { onEdit, onCheck, onShowInterest }
 }
 
 describe('AccountRow', () => {
@@ -54,6 +64,7 @@ describe('AccountRow', () => {
       as_of: null,
       opening_balance_paise: 12_345_678,
       postings_paise: 0,
+      interest_paise: 0,
       balance_paise: 12_345_678,
     })
   })
@@ -103,7 +114,7 @@ describe('AccountRow', () => {
   })
 
   it('asks to open the editor, and shows it when open', () => {
-    const onEdit = renderRow(SAVINGS)
+    const { onEdit } = renderRow(SAVINGS)
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
 
@@ -112,6 +123,19 @@ describe('AccountRow', () => {
 
     renderRow(SAVINGS, undefined, true)
     expect(screen.getAllByText('editor')[0]).toBeInTheDocument()
+  })
+
+  it('asks to show the interest, and shows it when open', () => {
+    const { onShowInterest } = renderRow(SAVINGS)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Interest' }))
+
+    expect(onShowInterest).toHaveBeenCalled()
+    expect(screen.queryByText('interest')).not.toBeInTheDocument()
+
+    renderRow(SAVINGS, undefined, false, false, true)
+    expect(screen.getByRole('button', { name: 'Hide interest' })).toBeInTheDocument()
+    expect(screen.getAllByText('interest')[0]).toBeInTheDocument()
   })
 
   it('offers to close instead of edit while the editor is open', () => {

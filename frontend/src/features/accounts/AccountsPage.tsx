@@ -6,6 +6,7 @@ import AccountEditor from './AccountEditor'
 import AccountForm from './AccountForm'
 import AccountRow from './AccountRow'
 import BalanceCheckPanel from './BalanceCheckPanel'
+import InterestPanel from './InterestPanel'
 import { type NewAccount, useAccounts, useCreateAccount } from './useAccounts'
 
 interface AccountsPageProps {
@@ -24,6 +25,7 @@ export default function AccountsPage({ today = todayIso() }: AccountsPageProps =
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [checkingId, setCheckingId] = useState<number | null>(null)
+  const [interestId, setInterestId] = useState<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const list = accounts.data ?? []
@@ -79,6 +81,8 @@ export default function AccountsPage({ today = todayIso() }: AccountsPageProps =
               onEdit={() => setEditingId(editingId === account.id ? null : account.id)}
               isChecking={checkingId === account.id}
               onCheck={() => setCheckingId(checkingId === account.id ? null : account.id)}
+              isShowingInterest={interestId === account.id}
+              onShowInterest={() => setInterestId(interestId === account.id ? null : account.id)}
             >
               {editingId === account.id && (
                 <AccountEditor
@@ -93,6 +97,7 @@ export default function AccountsPage({ today = todayIso() }: AccountsPageProps =
               {checkingId === account.id && (
                 <BalanceCheckPanel accountId={account.id} today={today} />
               )}
+              {interestId === account.id && <InterestPanel accountId={account.id} today={today} />}
             </AccountRow>
           ))}
         </ul>

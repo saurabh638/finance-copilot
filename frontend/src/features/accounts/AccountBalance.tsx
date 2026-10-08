@@ -10,7 +10,9 @@ interface AccountBalanceProps {
  *
  * The balance is never stored: it is the opening balance plus every posting
  * since. Showing the parts means a surprising number can be checked instead of
- * merely mistrusted.
+ * merely mistrusted. Interest is one of those parts rather than another line of
+ * the sum, so it is reported as "of which" - part of the movements, not beside
+ * them, which is what stops it being counted twice.
  */
 export default function AccountBalance({ accountId }: AccountBalanceProps) {
   const balance = useBalance(accountId)
@@ -34,6 +36,11 @@ export default function AccountBalance({ accountId }: AccountBalanceProps) {
         Opening {formatPaise(balance.data.opening_balance_paise)} + movements{' '}
         {formatPaise(balance.data.postings_paise)}
       </p>
+      {balance.data.interest_paise !== 0 && (
+        <p className="text-sm text-slate-600">
+          of which interest {formatPaise(balance.data.interest_paise)}
+        </p>
+      )}
     </div>
   )
 }
