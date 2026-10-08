@@ -31,7 +31,7 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M12b The repeats screen and the check-in's due rows | done | The plan edited on a fifth tab, and what is owed today offered above the fields on the Today screen with one-tap confirmation, a different amount, or a skip. Approved. |
 | M13a Interest accrual engine | done | `core/interest.py` with the stated day count and single rounding, `interest_credits`, the propose/confirm service and its endpoints, the in-process APScheduler job and an `accrue` command. Approved. |
 | M13b The interest panel | done | A third panel on an account: what is credited and what is waiting, a bank figure to confirm against the ledger's, a period thrown away and worked out again, and interest as its own line under the balance. M13 is complete. Approved. |
-| M14 Quick text entry | not started | |
+| M14 Quick text entry | done | The Today screen reads one typed line into the recording form — amount, date, direction, account by name or alias, category, merchant, note, or a transfer between two accounts — showing what it understood part by part, saying what it would not guess, and asking with one button per answer. Completes Phase 0's build. Approved. |
 | Phase 0 gate (two weeks of real use) | not started | |
 | M15 Import framework and SBI CSV | not started | |
 | M16 Rules, merchants, transfers, refunds | not started | |
@@ -43,11 +43,12 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 ## Current focus
 
 **M13 is complete**: rates produce interest, the engine proposes a finished period, and the screen settles it
-against what the bank actually paid — with the difference visible rather than smoothed over. **M14 (quick
-text entry) is the last build in Phase 0.** **The two-week Phase 0 gate is still outstanding**: the app used
-on manual entry, the ledger staying current, a check-in under a minute, and write-offs under 5% of spending.
-The gate needs the twelve figures only the user can give (`docker compose exec -T backend python -m app.cli
-seed`), and then real use.
+against what the bank actually paid — with the difference visible rather than smoothed over. **M14 is complete
+and with it Phase 0's build**: `450 dinner big bazaar hdfc` on the Today screen becomes ₹450.00, *Big Bazaar*,
+note *dinner*, out of the account that answers to `hdfc`, shown as a reading to correct and never guessed at.
+**The two-week Phase 0 gate is now the only thing outstanding**: the app used on manual entry, the ledger
+staying current, a check-in under a minute, and write-offs under 5% of spending. The gate needs the twelve
+figures only the user can give (`docker compose exec -T backend python -m app.cli seed`), and then real use.
 
 Before the app holds real data:
 
@@ -105,6 +106,14 @@ Before the app holds real data:
   ₹584.00*, and the ledger holds one `interest` posting dated 30 September. **September's spending is ₹0**
   and October's is unchanged. Two rates are therefore live in the development database (SBI and the
   *Walkthrough* account), so the daily timer will propose October's interest for SBI on 1 November.
+- The M14 walkthrough gave **SBI Credit Card (demo)** the alias `hdfc`, tried to give *Cash (demo)* the alias
+  `sbi` and was refused in words (`'sbi' already means 'SBI'; choose another alias`), then read a dozen lines
+  on the Today screen without saving any of them but one: `450 dinner big bazaar hdfc` became ₹450.00,
+  *Big Bazaar*, note *dinner*, out of the credit card, unfiled. The card's balance went ₹12,345.00 →
+  ₹11,895.00, the run of days went 8 → 9, and the line emptied itself once it was recorded. The lines that
+  asked questions — two accounts matching, the word *rent* being both a category and a merchant, a transfer
+  missing an account — were read, answered and left unsaved. **October reads ₹26,550.00 now** (₹26,100.00
+  before this movement), ₹6,200.00 of it filed under nothing.
 
 ## Open questions
 
