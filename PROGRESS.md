@@ -170,9 +170,14 @@ Before the app holds real data:
 - The bank-figure field forgets what was typed when the panel is closed, and a rate's crediting rhythm is
   changed by adding a new rate record rather than from this panel, which does not say which rhythm is in
   force.
-- `SpendView.test.tsx` (categories) failed once during a full frontend run and has passed every time since,
-  alone and in the suite. It is a flake in a test older than this milestone, whose cause is not yet known;
-  worth watching rather than papering over.
+- `SpendView.test.tsx` failed once during a full frontend run and passed every time afterwards, alone and in
+  the suite, which was recorded here as a flake worth watching. **Closed**: it was the first sighting of a
+  general fault. `SpendView`, `RecurringPage` and `CategoriesPage` each failed once at ~1.2 s in a full run
+  while passing alone, and the cause was Testing Library's one-second wait on finders — 123 of them across the
+  suite, none with a timeout of its own — on page tests that render a whole screen before the first finder can
+  resolve. The setup now waits five seconds, with Vitest's own timeout above it so a real failure still names
+  the finder that was waiting. Proven by running the suite under eight CPU loops, where it failed on the first
+  attempt before the change and passed on three after it.
 - The app has no router, so a page reload returns to the Today tab rather than the screen being looked at.
   That was decided in M8b and is felt most on the Accounts screen, where a reload now also closes a panel.
 - A write-off is now filed under `Unaccounted for spending` or `Unrecorded income`, by the sign of its
