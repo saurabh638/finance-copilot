@@ -19,5 +19,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Above the finders' own wait in the setup file, so a screen that genuinely
+    // never arrives is reported by the finder that was waiting for it rather
+    // than by Vitest killing the test first.
+    testTimeout: 10000,
   },
 })
