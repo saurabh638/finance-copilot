@@ -114,3 +114,15 @@ the other.
 - The merchant is chosen from the names the history knows and the rest of the words become the note; two known names is a question. — `450 dinner big bazaar` must mean *Big Bazaar* with the note *dinner*, and both readings of two known names are right.
 - A transfer is read as two accounts, and whatever is left over is its note. — Money that only moves is not spending, so it can be filed under nothing and has no merchant to name.
 - The Today screen carries a note box. — A reading that cannot be corrected where it was read is a promise the screen does not keep.
+
+## Imports
+
+- A statement is read, checked and held before anything is written; committing is a second, deliberate act. — The rows are stored as they were read, so the preview somebody agreed to is the commit, and a file that does not reconcile never reaches the ledger.
+- Reconciliation is two answers, not one: the file's own arithmetic, and whether the ledger plus the rows reaches the closing figure. — A perfect file can still mean the ledger is missing movements, and one vague "does not reconcile" would hide which of the two is wrong.
+- Only the rows the ledger is missing count towards the closing figure when agreeing with the ledger. — A statement read twice has every row already recorded, and counting them again would refuse a perfectly good file.
+- A row's identity is the account, the day the money moved, the amount and the normalised narration; the unique index on it is partial and live-only. — The same payment cannot be recorded twice, while a reversed batch or a removed movement releases exactly its row so the statement can be read again.
+- Two rows in one file that cannot be told apart are refused, naming both, rather than merged. — Importing one and dropping the other would be a silent guess about somebody's money.
+- A reader declares whether a statement counts money held or money owed, and the import path never knows the difference. — A card statement is the same arithmetic negated, so no per-bank rule leaks into the ledger.
+- An imported movement is written through the ordinary recording path with `source = import`, and no merchant is invented from the narration. — It has to be correctable like any other movement, and naming a merchant from a bank's wording is M16's resolver, not a guess at import time.
+- Committing writes row by row, and a preview that was never committed can be reversed like a committed one. — A database fault mid-commit must leave a remedy, and putting a preview away is the same action as undoing it.
+- The plain reader takes ISO dates and a signed decimal amount, and says which row it failed on. — `01/09/2026` is a bank's convention and belongs to that bank's reader; a strict reader that names the line is more useful than a forgiving one that guesses.

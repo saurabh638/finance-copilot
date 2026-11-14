@@ -32,8 +32,9 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 | M13a Interest accrual engine | done | `core/interest.py` with the stated day count and single rounding, `interest_credits`, the propose/confirm service and its endpoints, the in-process APScheduler job and an `accrue` command. Approved. |
 | M13b The interest panel | done | A third panel on an account: what is credited and what is waiting, a bank figure to confirm against the ledger's, a period thrown away and worked out again, and interest as its own line under the balance. M13 is complete. Approved. |
 | M14 Quick text entry | done | The Today screen reads one typed line into the recording form — amount, date, direction, account by name or alias, category, merchant, note, or a transfer between two accounts — showing what it understood part by part, saying what it would not guess, and asking with one button per answer. Completes Phase 0's build. Approved. |
-| Phase 0 gate (two weeks of real use) | not started | |
-| M15 Import framework and SBI CSV | not started | |
+| Phase 0 gate (two weeks of real use) | deferred | Deferred by the user's decision, so Phase 1 started without it. To revisit once imports are in use |
+| M15a The import framework | done | A statement is read, checked against itself and against the ledger, and held as a batch that writes nothing until it is committed — then reversed whole. Fingerprints stop a payment being recorded twice, and a file that does not reconcile never reaches the ledger. Approved. |
+| M15b The SBI parser and the preview screen | not started | Needs a redacted SBI savings CSV |
 | M16 Rules, merchants, transfers, refunds | not started | |
 | M17 AI categorisation and review queue | not started | |
 | M18 Central Bank importer | not started | |
@@ -43,12 +44,15 @@ Status values: `not started`, `plan approved`, `built, awaiting verification`, `
 ## Current focus
 
 **M13 is complete**: rates produce interest, the engine proposes a finished period, and the screen settles it
-against what the bank actually paid — with the difference visible rather than smoothed over. **M14 is complete
-and with it Phase 0's build**: `450 dinner big bazaar hdfc` on the Today screen becomes ₹450.00, *Big Bazaar*,
-note *dinner*, out of the account that answers to `hdfc`, shown as a reading to correct and never guessed at.
-**The two-week Phase 0 gate is now the only thing outstanding**: the app used on manual entry, the ledger
-staying current, a check-in under a minute, and write-offs under 5% of spending. The gate needs the twelve
-figures only the user can give (`docker compose exec -T backend python -m app.cli seed`), and then real use.
+against what the bank actually paid — with the difference visible rather than smoothed over. **M14 completed
+Phase 0's build**: `450 dinner big bazaar hdfc` on the Today screen becomes ₹450.00, *Big Bazaar*, note
+*dinner*, out of the account that answers to `hdfc`, shown as a reading to correct and never guessed at.
+
+**The Phase 0 gate is deferred by the user's decision**, and Phase 1 has started without it. That is worth
+stating plainly: the gate was the only evidence that manual entry is fast enough and that write-offs stay
+rare, and Phase 1's own gate — 90% correctly categorised — now has no baseline of real data to be measured
+against. **M15a (the import framework) is done**; **M15b (the SBI reader and the preview screen) needs a
+redacted SBI statement** and is the next build.
 
 Before the app holds real data:
 
@@ -114,6 +118,14 @@ Before the app holds real data:
   asked questions — two accounts matching, the word *rent* being both a category and a merchant, a transfer
   missing an account — were read, answered and left unsaved. **October reads ₹26,550.00 now** (₹26,100.00
   before this movement), ₹6,200.00 of it filed under nothing.
+- The M15a walkthrough used a throwaway account called *Import walkthrough* (opening ₹1,000.00 on
+  2026-04-01), imported a four-row statement that opens at ₹1,000.00 and closes at ₹450.25, and checked the
+  four things that matter: the preview wrote nothing, committing landed the balance exactly on ₹450.25,
+  reading the same file again found all four rows already there, and reversing put the balance back to
+  ₹1,000.00 with no movements left. A closing figure one paise out was refused before anything was stored.
+  The account was removed afterwards, so the database keeps **two `import_batches` rows pointing at a
+  soft-deleted account** whose imported movements are also soft-deleted: invisible everywhere, and a reminder
+  that a batch outlives the account it was read for.
 
 ## Open questions
 
