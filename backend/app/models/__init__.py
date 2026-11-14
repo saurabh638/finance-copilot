@@ -8,12 +8,14 @@ from app.models.enums import (
     AccountType,
     CaptureMode,
     CategoryKind,
+    ImportStatus,
     OccurrenceState,
     PostingKind,
     RateFrequency,
     RecurringFrequency,
     TransactionSource,
 )
+from app.models.import_batch import ImportBatch
 from app.models.interest_credit import InterestCredit
 from app.models.interest_rate import InterestRate
 from app.models.login_failure import LoginFailure
@@ -32,6 +34,8 @@ __all__ = [
     "CaptureMode",
     "Category",
     "CategoryKind",
+    "ImportBatch",
+    "ImportStatus",
     "InterestCredit",
     "InterestRate",
     "LoginFailure",

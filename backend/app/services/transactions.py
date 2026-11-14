@@ -74,6 +74,21 @@ class Movement:
     category_id: int | None = None
 
 
+@dataclass(frozen=True)
+class ImportedLine:
+    """The part of a transaction that only a statement can supply.
+
+    A movement typed by hand has none of this. An imported one keeps the bank's own
+    date, the words the bank used, the file it came from and the row's identity, so
+    the batch can be undone whole and no row can be recorded twice.
+    """
+
+    posted_on: date
+    raw_narration: str
+    batch_id: int
+    fingerprint: str
+
+
 # Only spending and earning have categories the user chooses. A transfer moves
 # money without spending it, and a write-off's filing is chosen for it.
 _CATEGORY_KINDS: dict[PostingKind, CategoryKind] = {
@@ -185,6 +200,7 @@ def record_expense(
     category_id: int | None = None,
     parts: Sequence[SplitPartCreate] | None = None,
     source: TransactionSource = TransactionSource.MANUAL,
+    imported: ImportedLine | None = None,
 ) -> Transaction:
     """Record money leaving an account. Give the amount as a positive number.
 
@@ -203,6 +219,7 @@ def record_expense(
         merchant=merchant,
         note=note,
         source=source,
+        imported=imported,
     )
 
 
@@ -217,6 +234,7 @@ def record_income(
     category_id: int | None = None,
     parts: Sequence[SplitPartCreate] | None = None,
     source: TransactionSource = TransactionSource.MANUAL,
+    imported: ImportedLine | None = None,
 ) -> Transaction:
     """Record money arriving. Give the amount as a positive number."""
     _require_positive(amount_paise)
@@ -231,6 +249,7 @@ def record_income(
         merchant=merchant,
         note=note,
         source=source,
+        imported=imported,
     )
 
 
@@ -401,6 +420,7 @@ def _record(
     merchant: str | None = None,
     note: str | None = None,
     source: TransactionSource = TransactionSource.MANUAL,
+    imported: ImportedLine | None = None,
 ) -> Transaction:
     """Write one transaction and its postings, as one piece.
 
@@ -419,6 +439,10 @@ def _record(
         merchant=merchant,
         note=note,
         source=source,
+        posted_date=None if imported is None else imported.posted_on,
+        raw_narration=None if imported is None else imported.raw_narration,
+        import_batch_id=None if imported is None else imported.batch_id,
+        fingerprint=None if imported is None else imported.fingerprint,
     )
     db.add(transaction)
     db.flush()

@@ -94,6 +94,20 @@ class OccurrenceState(StrEnum):
     SKIPPED = "skipped"
 
 
+class ImportStatus(StrEnum):
+    """Where a read statement is in its life.
+
+    `previewed` means the rows have been read, questioned and stored, and nothing
+    has been written. `committed` means the movements are on the ledger.
+    `reversed` means they have all been removed again, and the batch stays as the
+    record that this file was once imported.
+    """
+
+    PREVIEWED = "previewed"
+    COMMITTED = "committed"
+    REVERSED = "reversed"
+
+
 def enum_values(enum_class: type[Enum]) -> list[str]:
     """Persist the lower-case enum values rather than the member names."""
     return [str(member.value) for member in enum_class]

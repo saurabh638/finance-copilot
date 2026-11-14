@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,15 @@ class Transaction(TimestampMixin, Base):
             allowed_values("source", TransactionSource),
             name="ck_transactions_source",
         ),
+        # An imported row is one row, once. The fingerprint carries the account it
+        # lands on, so this is per account; partial, so a reversed batch releases
+        # its rows and the same statement can be read again.
+        Index(
+            "uq_transactions_fingerprint",
+            "fingerprint",
+            unique=True,
+            postgresql_where=text("fingerprint IS NOT NULL AND deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -35,6 +44,12 @@ class Transaction(TimestampMixin, Base):
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # The statement's own words, kept for imports and never shown as the merchant.
     raw_narration: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set only for an imported movement: which file wrote it, and the row's stable
+    # identity, so the same payment cannot be recorded twice.
+    import_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("import_batches.id"), nullable=True, index=True
+    )
+    fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source: Mapped[TransactionSource] = mapped_column(
         SqlEnum(
             TransactionSource,
