@@ -690,6 +690,90 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/imports': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List Statements
+     * @description Every statement read in so far, newest first.
+     */
+    get: operations['list_statements_api_v1_imports_get']
+    put?: never
+    /**
+     * Upload Statement
+     * @description Read a statement and show what committing it would do. Writes nothing.
+     */
+    post: operations['upload_statement_api_v1_imports_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/imports/{batch_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Read Statement
+     * @description One statement, with what committing it would still add.
+     */
+    get: operations['read_statement_api_v1_imports__batch_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/imports/{batch_id}/commit': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Commit Statement
+     * @description Write the movements this statement adds, skipping the ones already recorded.
+     */
+    post: operations['commit_statement_api_v1_imports__batch_id__commit_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/imports/{batch_id}/reverse': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Reverse Statement
+     * @description Undo the whole batch, or put away a preview that was never committed.
+     */
+    post: operations['reverse_statement_api_v1_imports__batch_id__reverse_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -925,6 +1009,34 @@ export interface components {
       /** Balance Paise */
       balance_paise: number
     }
+    /** Body_upload_statement_api_v1_imports_post */
+    Body_upload_statement_api_v1_imports_post: {
+      /**
+       * Account Id
+       * @description The account the statement belongs to.
+       */
+      account_id: number
+      /**
+       * File
+       * @description The statement file, as CSV text.
+       */
+      file: string
+      /**
+       * Opening Paise
+       * @description What the statement opened at, if the file does not say.
+       */
+      opening_paise?: number | null
+      /**
+       * Closing Paise
+       * @description What the statement closed at, if the file does not say.
+       */
+      closing_paise?: number | null
+      /**
+       * Parser
+       * @description Which reader to use; generic by default.
+       */
+      parser?: string | null
+    }
     /**
      * CaptureMode
      * @description How the transactions for an account are expected to arrive.
@@ -1082,6 +1194,101 @@ export interface components {
       /** Database */
       database: string
     }
+    /**
+     * ImportBatchResponse
+     * @description A statement that was read, and what committing it would do.
+     *
+     *     `to_add` and `duplicates` are what the screen shows: the rows that are new, and
+     *     the rows the ledger already holds. A batch that has been committed or reversed
+     *     reports neither, because there is nothing left to decide.
+     */
+    ImportBatchResponse: {
+      /** Id */
+      id: number
+      /** Account Id */
+      account_id: number
+      /** Filename */
+      filename: string
+      /** Parser */
+      parser: string
+      status: components['schemas']['ImportStatus']
+      /**
+       * Period Start
+       * Format: date
+       */
+      period_start: string
+      /**
+       * Period End
+       * Format: date
+       */
+      period_end: string
+      /** Opening Paise */
+      opening_paise: number
+      /** Closing Paise */
+      closing_paise: number
+      /** Row Count */
+      row_count: number
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Committed At */
+      committed_at: string | null
+      /** Reversed At */
+      reversed_at: string | null
+      /**
+       * To Add
+       * @default []
+       */
+      to_add: components['schemas']['ImportRowResponse'][]
+      /**
+       * Duplicates
+       * @default []
+       */
+      duplicates: components['schemas']['ImportRowResponse'][]
+    }
+    /**
+     * ImportRowResponse
+     * @description One row of a statement, as it was read.
+     */
+    ImportRowResponse: {
+      /**
+       * Posted On
+       * Format: date
+       * @description The bank's own date for the row.
+       */
+      posted_on: string
+      /**
+       * Value On
+       * Format: date
+       * @description The day the money moved; the movement is dated here.
+       */
+      value_on: string
+      /**
+       * Amount Paise
+       * @description Signed: negative is money out.
+       */
+      amount_paise: number
+      /** Narration */
+      narration: string
+      /**
+       * Fingerprint
+       * @description The row's identity, so it cannot be recorded twice.
+       */
+      fingerprint: string
+    }
+    /**
+     * ImportStatus
+     * @description Where a read statement is in its life.
+     *
+     *     `previewed` means the rows have been read, questioned and stored, and nothing
+     *     has been written. `committed` means the movements are on the ledger.
+     *     `reversed` means they have all been removed again, and the batch stays as the
+     *     record that this file was once imported.
+     * @enum {string}
+     */
+    ImportStatus: 'previewed' | 'committed' | 'reversed'
     /**
      * IncomeCreate
      * @description Money arriving in one account.
@@ -3131,6 +3338,164 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_statements_api_v1_imports_get: {
+    parameters: {
+      query?: {
+        limit?: number
+        offset?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportBatchResponse'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  upload_statement_api_v1_imports_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_statement_api_v1_imports_post']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportBatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  read_statement_api_v1_imports__batch_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        batch_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportBatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  commit_statement_api_v1_imports__batch_id__commit_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        batch_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportBatchResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reverse_statement_api_v1_imports__batch_id__reverse_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        batch_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportBatchResponse']
+        }
       }
       /** @description Validation Error */
       422: {
