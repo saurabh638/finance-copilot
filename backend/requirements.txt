@@ -8,3 +8,6 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 argon2-cffi==25.1.0
 APScheduler==3.11.0
+# FastAPI needs this to read a file uploaded with a form; the CSV itself is parsed
+# with the standard library, so no table library is added for it.
+python-multipart==0.0.33
